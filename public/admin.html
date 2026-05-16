@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+ <meta charset="UTF-8">
+ <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+ <title>生鲜台账 - 管理后台</title>
+ <style>
+ * { box-sizing: border-box; margin: 0; padding: 0; }
+ body {
+  font-family: -apple-system, BlinkMacSystemFont, "微软雅黑", sans-serif;
+  max-width: 800px;
+  margin: 0 auto;
+  background: #f5f5f5;
+  padding: 10px;
+ }
+ .title { text-align: center; font-size: 22px; color: #ff6b35; font-weight: bold; margin: 8px 0 16px; }
+ .card { background: white; border-radius: 10px; padding: 14px 16px; margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+ h3 { font-size: 16px; font-weight: 600; color: #333; margin-bottom: 8px; border-left: 4px solid #ff6b35; padding-left: 8px; }
+ .stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px; margin: 8px 0; }
+ .stat-card { background: #fff8f0; border-radius: 8px; padding: 12px; text-align: center; }
+ .stat-num { font-size: 26px; font-weight: bold; color: #ff6b35; }
+ .stat-label { font-size: 12px; color: #999; margin-top: 4px; }
+ table { width: 100%; border-collapse: collapse; font-size: 14px; }
+ th, td { padding: 8px 10px; text-align: left; border-bottom: 1px solid #eee; }
+ th { background: #fafafa; font-size: 12px; color: #666; font-weight: 600; }
+ tr:hover td { background: #f9f9f9; }
+ .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 12px; }
+ .badge-unpay { background: #ffe0e0; color: #dc3545; }
+ .badge-pay { background: #d4edda; color: #28a745; }
+ .btn {
+  background: #ff6b35; color: white; border: none; border-radius: 6px;
+  padding: 8px 14px; font-size: 13px; cursor: pointer;
+ }
+ .btn:active { opacity: 0.8; }
+ .btn-sm { padding: 4px 8px; font-size: 12px; }
+ .btn-danger { background: #dc3545; }
+ .nav-bar { display: flex; gap: 8px; margin-bottom: 12px; }
+ .nav-bar a { color: #666; text-decoration: none; font-size: 13px; padding: 6px 12px; border-radius: 6px; background: #eee; }
+ .nav-bar a:hover { background: #ddd; }
+ .nav-bar a.active { background: #ff6b35; color: white; }
+ .tab-page { display: none; }
+ .tab-page.active { display: block; }
+ .search-box { margin: 8px 0; display: flex; gap: 8px; }
+ .search-box input { flex: 1; padding: 8px; border: 1px solid #ddd; border-radius: 6px; font-size: 13px; }
+ .search-box select { padding: 8px; border: 1px solid #ddd; border-radius: 6px; font-size: 13px; }
+ .empty { text-align: center; color: #bbb; padding: 20px; font-size: 14px; }
+ .pagination { display: flex; justify-content: center; gap: 4px; margin-top: 8px; }
+ .pagination span { padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 13px; }
+ .pagination span:hover { background: #eee; }
+ .pagination span.active { background: #ff6b35; color: white; }
+ .shop-item { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #f0f0f0; align-items: center; }
+ .shop-item:last-child { border-bottom: none; }
+ </style>
+</head>
+<body>
+
+<div class="title">🥬 生鲜台账 · 管理后台</div>
+<div class="nav-bar">
+ <a href="/" style="background:#ff6b35;color:white">← 返回记账</a>
+ <a href="#" class="active" onclick="switchTab('overview')">📊 概览</a>
+ <a href="#" onclick="switchTab('records-list')">📋 所有记录</a>
+ <a href="#" onclick="switchTab('shops')">🏪 商家管理</a>
+ <a href="#" onclick="switchTab('export')">📤 数据导出</a>
+</div>
+
+<!-- 概览 -->
+<div id="tab-overview" class="tab-page active">
+ <div class="card">
+  <h3>📊 数据概览</h3>
+  <div class="stats-row" id="statsCards"></div>
+ </div>
+ <div class="card">
+  <h3>🏆 进货最多的商家（Top 10）</h3>
+  <div id="topShops"></div>
+ </div>
+</div>
+
+<!-- 所有记录 -->
+<div id="tab-records-list" class="tab-page">
+ <div class="card">
+  <h3>📋 全部进货记录</h3>
+  <div class="search-box">
+   <input type="text" id="searchInput" placeholder="搜索商家、菜品..." oninput="onSearch()">
+   <select id="statusFilter" onchange="onSearch()">
+    <option value="">全部状态</option>
+    <option value="未付">未付</option>
+    <option value="已付">已付</option>
+   </select>
+  </div>
+  <table id="recordsTable">
+   <thead><tr><th>日期</th><th>商家</th><th>菜品</th><th>斤数</th><th>金额</th><th>状态</th><th>操作</th></tr></thead>
+   <tbody id="recordsBody"></tbody>
+  </table>
+  <div class="pagination" id="pagination"></div>
+ </div>
+</div>
+
+<!-- 商家管理 -->
+<div id="tab-shops" class="tab-page">
+ <div class="card">
+  <h3>🏪 商家列表</h3>
+  <div style="display:flex;gap:8px;margin-bottom:8px">
+   <input type="text" id="newShopName" placeholder="输入新商家名称" style="flex:2;padding:8px;border:1px solid #ddd;border-radius:6px;font-size:13px">
+   <button class="btn" onclick="addShop()" style="flex:1">添加商家</button>
+  </div>
+  <div id="shopList"></div>
+ </div>
+</div>
+
+<!-- 导出 -->
+<div id="tab-export" class="tab-page">
+ <div class="card">
+  <h3>📤 导出数据</h3>
+  <p style="font-size:14px;color:#666;margin-bottom:12px">将所有进货记录导出为 CSV 文件，可用 Excel 打开。</p>
+  <button class="btn btn-danger" onclick="window.open('/api/export', '_blank')" style="width:auto">📥 下载 CSV</button>
+ </div>
+ <div class="card">
+  <h3>🔄 数据同步</h3>
+  <p style="font-size:14px;color:#666;margin-bottom:8px">所有数据存储在本机服务器，多设备可通过连接此服务同步。</p>
+  <p style="font-size:13px;color:#999">服务器地址：<code id="serverUrl">http://127.0.0.1:3100</code></p>
+ </div>
+</div>
+
+<script>
+const API = '';
+
+function switchTab(name) {
+  document.querySelectorAll('.tab-page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-bar a[href="#"]').forEach(a => a.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  document.querySelector(`.nav-bar a[onclick*="'${name}'"]`).classList.add('active');
+  if (name === 'overview') loadOverview();
+  if (name === 'shops') loadShops();
+  if (name === 'records-list') loadRecords();
+}
+
+// ====== API ======
+async function get(url) {
+  const r = await fetch(API + url);
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  return r.json();
+}
+async function post(url, body) {
+  const r = await fetch(API + url, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  return r.json();
+}
+async function del(url) {
+  const r = await fetch(API + url, { method: 'DELETE' });
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  return r.json();
+}
+async function put(url) {
+  const r = await fetch(API + url, { method: 'PUT' });
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  return r.json();
+}
+
+// ====== 概览 ======
+async function loadOverview() {
+  try {
+    const data = await get('/api/admin/stats');
+    document.getElementById('statsCards').innerHTML = `
+      <div class="stat-card"><div class="stat-num">${data.totalRecords}</div><div class="stat-label">总记录数</div></div>
+      <div class="stat-card"><div class="stat-num">${data.totalShops}</div><div class="stat-label">商家数量</div></div>
+      <div class="stat-card"><div class="stat-num">${data.unpayCount}</div><div class="stat-label">未付款笔数</div></div>
+      <div class="stat-card"><div class="stat-num">¥${(data.totalSpent || 0).toFixed(1)}</div><div class="stat-label">总支出</div></div>
+    `;
+    const topHtml = data.topShops.length === 0
+      ? '<div class="empty">暂无数据</div>'
+      : '<table><tr><th>排名</th><th>商家</th><th>总金额</th></tr>' +
+        data.topShops.map((s, i) => `<tr><td>${i+1}</td><td>${s.shop}</td><td>¥${s.total.toFixed(1)}</td></tr>`).join('') +
+        '</table>';
+    document.getElementById('topShops').innerHTML = topHtml;
+  } catch (e) {
+    document.getElementById('statsCards').innerHTML = '<div class="empty">加载失败: ' + e.message + '</div>';
+  }
+}
+
+// ====== 所有记录 ======
+let allRecords = [];
+let currentPage = 0;
+const PAGE_SIZE = 20;
+
+async function loadRecords() {
+  try {
+    const data = await get('/api/records');
+    allRecords = data.records || [];
+    currentPage = 0;
+    renderRecords();
+  } catch {}
+}
+
+function onSearch() {
+  currentPage = 0;
+  renderRecords();
+}
+
+function renderRecords() {
+  const q = document.getElementById('searchInput').value.trim().toLowerCase();
+  const statusFilter = document.getElementById('statusFilter').value;
+
+  let filtered = allRecords;
+  if (q) filtered = filtered.filter(r => r.shop.includes(q) || r.food.includes(q));
+  if (statusFilter) filtered = filtered.filter(r => r.status === statusFilter);
+
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE) || 1;
+  const start = currentPage * PAGE_SIZE;
+  const page = filtered.slice(start, start + PAGE_SIZE);
+
+  const tbody = document.getElementById('recordsBody');
+  if (page.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="7" class="empty">暂无记录</td></tr>';
+  } else {
+    tbody.innerHTML = page.map(r => `
+      <tr>
+        <td>${r.date}</td>
+        <td>${r.shop}</td>
+        <td>${r.food}</td>
+        <td>${r.weight}</td>
+        <td>¥${r.money}</td>
+        <td><span class="badge ${r.status === '未付' ? 'badge-unpay' : 'badge-pay'}">${r.status}</span></td>
+        <td>
+          <button class="btn btn-sm ${r.status === '未付' ? 'btn-danger' : ''}" onclick="toggleStatus('${r.id}')">${r.status === '未付' ? '标记已付' : '标记未付'}</button>
+          <button class="btn btn-sm" style="background:#999;margin-left:4px" onclick="deleteRecord('${r.id}')">删除</button>
+        </td>
+      </tr>
+    `).join('');
+  }
+
+  const pag = document.getElementById('pagination');
+  if (totalPages > 1) {
+    let h = '';
+    for (let i = 0; i < totalPages; i++) {
+      h += `<span class="${i === currentPage ? 'active' : ''}" onclick="goPage(${i})">${i+1}</span>`;
+    }
+    pag.innerHTML = h;
+  } else {
+    pag.innerHTML = '';
+  }
+}
+
+function goPage(p) { currentPage = p; renderRecords(); }
+
+async function toggleStatus(id) {
+  try { await put('/api/records/' + id + '/toggle-status'); loadRecords(); }
+  catch {}
+}
+async function deleteRecord(id) {
+  if (!confirm('删除这条记录？')) return;
+  try { await del('/api/records/' + id); loadRecords(); }
+  catch {}
+}
+
+// ====== 商家管理 ======
+async function loadShops() {
+  try {
+    const data = await get('/api/shops');
+    const shops = data.shops || [];
+    document.getElementById('shopList').innerHTML = shops.length === 0
+      ? '<div class="empty">暂无商家</div>'
+      : shops.map(s => `<div class="shop-item"><span>${s}</span><button class="btn btn-sm btn-danger" onclick="deleteShop('${s}')">删除</button></div>`).join('');
+  } catch {}
+}
+
+async function addShop() {
+  const name = document.getElementById('newShopName').value.trim();
+  if (!name) return alert('请输入商家名称');
+  try {
+    await post('/api/shops', { name });
+    document.getElementById('newShopName').value = '';
+    loadShops();
+    alert('✅ 已添加');
+  } catch { alert('添加失败'); }
+}
+
+async function deleteShop(name) {
+  if (!confirm('删除商家「' + name + '」？已有记录不会删除。')) return;
+  try {
+    await del('/api/shops/' + encodeURIComponent(name));
+    loadShops();
+  } catch { alert('删除失败'); }
+}
+
+// ====== 初始化 ======
+window.onload = function () {
+  loadOverview();
+};
+</script>
+</body>
+</html>
