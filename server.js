@@ -1,31 +1,188 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
+const Database = require('better-sqlite3');
 
 const DATA_DIR = path.join(__dirname, 'data');
-const RECORDS_FILE = path.join(DATA_DIR, 'records.json');
-const PORT = 3100;
+const DB_PATH = path.join(DATA_DIR, 'ledger.db');
+const PORT = process.env.PORT || 3100;
 
-// ====== 数据存储 ======
-function ensureDir() {
+// ====== SQLite 数据库 ======
+function initDB() {
   if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+  
+  const db = new Database(DB_PATH);
+  
+  // 启用 WAL 模式，性能更好
+  db.pragma('journal_mode = WAL');
+  
+  // 创建表
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS shops (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL UNIQUE,
+      createdAt TEXT DEFAULT (datetime('now'))
+    );
+    
+    CREATE TABLE IF NOT EXISTS records (
+      id TEXT PRIMARY KEY,
+      date TEXT NOT NULL,
+      time TEXT,
+      shop TEXT NOT NULL,
+      food TEXT NOT NULL,
+      weight REAL NOT NULL,
+      price REAL NOT NULL,
+      money REAL NOT NULL,
+      status TEXT DEFAULT '未付',
+      createdAt TEXT DEFAULT (datetime('now'))
+    );
+    
+    CREATE INDEX IF NOT EXISTS idx_records_date ON records(date);
+    CREATE INDEX IF NOT EXISTS idx_records_status ON records(status);
+    CREATE INDEX IF NOT EXISTS idx_records_shop ON records(shop);
+  `);
+  
+  return db;
 }
 
-function loadData() {
-  ensureDir();
-  try {
-    return JSON.parse(fs.readFileSync(RECORDS_FILE, 'utf8'));
-  } catch {
-    return { shops: [], records: [] };
+const db = initDB();
+
+// ====== 数据访问函数 ======
+function getShops() {
+  const rows = db.prepare('SELECT name FROM shops ORDER BY name').all();
+  return rows.map(r => r.name);
+}
+
+function addShop(name) {
+  db.prepare('INSERT INTO shops (name) VALUES (?)').run(name);
+}
+
+function deleteShop(name) {
+  db.prepare('DELETE FROM shops WHERE name = ?').run(name);
+}
+
+function getRecords(filters = {}) {
+  let sql = 'SELECT * FROM records WHERE 1=1';
+  const params = [];
+  
+  if (filters.date && filters.date !== 'all') {
+    sql += ' AND date = ?';
+    params.push(filters.date);
   }
+  if (filters.shop) {
+    sql += ' AND shop = ?';
+    params.push(filters.shop);
+  }
+  if (filters.status) {
+    sql += ' AND status = ?';
+    params.push(filters.status);
+  }
+  
+  sql += ' ORDER BY createdAt DESC';
+  
+  return db.prepare(sql).all(...params);
 }
 
-function saveData(data) {
-  ensureDir();
-  fs.writeFileSync(RECORDS_FILE, JSON.stringify(data, null, 2), 'utf8');
+function addRecord(record) {
+  db.prepare(`
+    INSERT INTO records (id, date, time, shop, food, weight, price, money, status)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(record.id, record.date, record.time, record.shop, record.food,
+         record.weight, record.price, record.money, record.status);
 }
 
-// ====== 静态文件 serve ======
+function toggleRecordStatus(id) {
+  const record = db.prepare('SELECT * FROM records WHERE id = ?').get(id);
+  if (!record) return null;
+  
+  const newStatus = record.status === '未付' ? '已付' : '未付';
+  db.prepare('UPDATE records SET status = ? WHERE id = ?').run(newStatus, id);
+  return { ...record, status: newStatus };
+}
+
+function deleteRecord(id) {
+  db.prepare('DELETE FROM records WHERE id = ?').run(id);
+}
+
+function payAllDebt() {
+  const result = db.prepare('UPDATE records SET status = ? WHERE status = ?').run('已付', '未付');
+  return result.changes;
+}
+
+function getSummary() {
+  const today = new Date().toLocaleDateString('zh-CN');
+  
+  const todayStats = db.prepare(`
+    SELECT COUNT(*) as count, COALESCE(SUM(money), 0) as total
+    FROM records WHERE date = ?
+  `).get(today);
+  
+  const debtStats = db.prepare(`
+    SELECT COUNT(*) as count, COALESCE(SUM(money), 0) as total
+    FROM records WHERE status = '未付'
+  `).get();
+  
+  const debtByShop = db.prepare(`
+    SELECT shop, COALESCE(SUM(money), 0) as total
+    FROM records WHERE status = '未付'
+    GROUP BY shop ORDER BY total DESC
+  `).all();
+  
+  const totalRecords = db.prepare('SELECT COUNT(*) as count FROM records').get();
+  
+  const debtObj = {};
+  debtByShop.forEach(r => { debtObj[r.shop] = r.total; });
+  
+  return {
+    today: { count: todayStats.count, total: todayStats.total },
+    debt: { total: debtStats.total, byShop: debtObj },
+    totalRecords: totalRecords.count
+  };
+}
+
+function getDates() {
+  return db.prepare('SELECT DISTINCT date FROM records ORDER BY date DESC').all().map(r => r.date);
+}
+
+function getAdminStats() {
+  const totalRecords = db.prepare('SELECT COUNT(*) as count FROM records').get().count;
+  const totalShops = db.prepare('SELECT COUNT(*) as count FROM shops').get().count;
+  const unpayCount = db.prepare("SELECT COUNT(*) as count FROM records WHERE status = '未付'").get().count;
+  const totalSpent = db.prepare('SELECT COALESCE(SUM(money), 0) as total FROM records').get().total;
+  
+  const topShops = db.prepare(`
+    SELECT shop, ROUND(COALESCE(SUM(money), 0), 2) as total
+    FROM records GROUP BY shop ORDER BY total DESC LIMIT 10
+  `).all();
+  
+  return { totalRecords, totalShops, unpayCount, totalSpent, topShops };
+}
+
+function clearAllRecords() {
+  db.prepare('DELETE FROM records').run();
+}
+
+function getAllRecordsForExport() {
+  return db.prepare('SELECT * FROM records ORDER BY createdAt DESC').all();
+}
+
+function getLocalDateStr(date) {
+  if (!date) date = new Date();
+  // 使用 toLocaleDateString('zh-CN') 得到如 "2026/5/16" 格式
+  // 但我们想要 "2026年5月16日" 这种显示格式统一
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}/${m}/${d}`;
+  // 用 / 分隔在 SQLite 排序和过滤中更可靠
+}
+
+function getLocalTimeStr(date) {
+  if (!date) date = new Date();
+  return date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+}
+
+// ====== 静态文件 ======
 const MIME = {
   '.html': 'text/html; charset=utf-8',
   '.js': 'application/javascript; charset=utf-8',
@@ -35,34 +192,7 @@ const MIME = {
   '.ico': 'image/x-icon'
 };
 
-function serveStatic(req, res) {
-  let urlPath = req.url.split('?')[0];
-  if (urlPath === '/') urlPath = '/index.html';
-  const filePath = path.join(__dirname, 'public', urlPath);
-  
-  fs.readFile(filePath, (err, data) => {
-    if (err) {
-      // 如果是 API 路径，返回 404
-      if (urlPath.startsWith('/api/') || urlPath.startsWith('/admin/')) {
-        res.writeHead(404, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: 'Not Found' }));
-        return;
-      }
-      // 否则返回 index.html（SPA 支持）
-      fs.readFile(path.join(__dirname, 'public', 'index.html'), (e2, d2) => {
-        if (e2) { res.writeHead(404); res.end('Not Found'); return; }
-        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-        res.end(d2);
-      });
-      return;
-    }
-    const ext = path.extname(filePath);
-    res.writeHead(200, { 'Content-Type': MIME[ext] || 'application/octet-stream' });
-    res.end(data);
-  });
-}
-
-// ====== API 处理 ======
+// ====== HTTP Server ======
 function parseBody(req) {
   return new Promise((resolve, reject) => {
     let body = '';
@@ -75,219 +205,185 @@ function parseBody(req) {
 }
 
 function sendJSON(res, code, data) {
-  res.writeHead(code, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+  res.writeHead(code, {
+    'Content-Type': 'application/json',
+    'Access-Control-Allow-Origin': '*'
+  });
   res.end(JSON.stringify(data));
 }
 
-async function handleAPI(req, res) {
-  const url = new URL(req.url, `http://127.0.0.1:${PORT}`);
-  const path = url.pathname;
-  const method = req.method;
+function serveStatic(req, res) {
+  let urlPath = req.url.split('?')[0];
+  if (urlPath === '/') urlPath = '/index.html';
+  const filePath = path.join(__dirname, 'public', urlPath);
+  
+  fs.readFile(filePath, (err, data) => {
+    if (err) {
+      if (urlPath.startsWith('/api/') || urlPath.startsWith('/admin/')) {
+        return sendJSON(res, 404, { error: 'Not Found' });
+      }
+      return fs.readFile(path.join(__dirname, 'public', 'index.html'), (e2, d2) => {
+        if (e2) { res.writeHead(404); res.end('Not Found'); return; }
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+        res.end(d2);
+      });
+    }
+    const ext = path.extname(filePath);
+    res.writeHead(200, { 'Content-Type': MIME[ext] || 'application/octet-stream' });
+    res.end(data);
+  });
+}
 
+async function handleAPI(req, res) {
+  const url = new URL(req.url, `http://localhost:${PORT}`);
+  const pathname = url.pathname;
+  const method = req.method;
+  
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-
+  
   if (method === 'OPTIONS') { res.writeHead(200); res.end(); return; }
-
-  const data = loadData();
-
-  // GET /api/records — 获取记录列表
-  if (path === '/api/records' && method === 'GET') {
-    let filtered = [...data.records];
-    const dateFilter = url.searchParams.get('date');
-    const shopFilter = url.searchParams.get('shop');
-    const statusFilter = url.searchParams.get('status');
-
-    if (dateFilter && dateFilter !== 'all') filtered = filtered.filter(r => r.date === dateFilter);
-    if (shopFilter) filtered = filtered.filter(r => r.shop === shopFilter);
-    if (statusFilter) filtered = filtered.filter(r => r.status === statusFilter);
-
-    return sendJSON(res, 200, { records: filtered, total: data.records.length });
-  }
-
-  // POST /api/records — 添加记录
-  if (path === '/api/records' && method === 'POST') {
-    try {
+  
+  try {
+    // GET /api/shops
+    if (pathname === '/api/shops' && method === 'GET') {
+      return sendJSON(res, 200, { shops: getShops() });
+    }
+    
+    // POST /api/shops
+    if (pathname === '/api/shops' && method === 'POST') {
+      const body = await parseBody(req);
+      const name = body.name?.trim();
+      if (!name) return sendJSON(res, 400, { error: '请输入商家名称' });
+      try {
+        addShop(name);
+        return sendJSON(res, 200, { success: true, name });
+      } catch {
+        return sendJSON(res, 400, { error: '商家已存在' });
+      }
+    }
+    
+    // DELETE /api/shops/:name
+    if (pathname.startsWith('/api/shops/') && method === 'DELETE') {
+      const name = decodeURIComponent(pathname.replace('/api/shops/', ''));
+      deleteShop(name);
+      return sendJSON(res, 200, { success: true });
+    }
+    
+    // GET /api/records
+    if (pathname === '/api/records' && method === 'GET') {
+      const filters = {
+        date: url.searchParams.get('date'),
+        shop: url.searchParams.get('shop'),
+        status: url.searchParams.get('status')
+      };
+      return sendJSON(res, 200, { records: getRecords(filters), total: getAdminStats().totalRecords });
+    }
+    
+    // POST /api/records
+    if (pathname === '/api/records' && method === 'POST') {
       const body = await parseBody(req);
       const { shop, food, weight, price, money, status } = body;
       if (!shop || !food || !weight || !price) {
         return sendJSON(res, 400, { error: '缺少必填字段' });
       }
-
-      const totalMoney = money || (parseFloat(weight) * parseFloat(price));
+      
       const now = new Date();
-      const date = now.toLocaleDateString('zh-CN');
-      const time = now.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
-
       const record = {
         id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
-        date, time,
+        date: getLocalDateStr(now),
+        time: getLocalTimeStr(now),
         shop, food,
         weight: parseFloat(weight),
         price: parseFloat(price),
-        money: Math.round(totalMoney * 100) / 100,
-        status: status || '未付',
-        createdAt: now.toISOString()
+        money: money ? Math.round(parseFloat(money) * 100) / 100 : Math.round(parseFloat(weight) * parseFloat(price) * 100) / 100,
+        status: status || '未付'
       };
-
-      data.records.unshift(record);
-      saveData(data);
+      
+      addRecord(record);
       return sendJSON(res, 200, { success: true, record });
-    } catch (e) {
-      return sendJSON(res, 400, { error: e.message });
     }
-  }
-
-  // PUT /api/records/:id/toggle-status — 切换付款状态
-  if (path.match(/^\/api\/records\/([^/]+)\/toggle-status$/) && method === 'PUT') {
-    const id = path.match(/^\/api\/records\/([^/]+)\/toggle-status$/)[1];
-    const record = data.records.find(r => r.id === id);
-    if (!record) return sendJSON(res, 404, { error: '记录不存在' });
-
-    record.status = record.status === '未付' ? '已付' : '未付';
-    saveData(data);
-    return sendJSON(res, 200, { success: true, record });
-  }
-
-  // DELETE /api/records/:id — 删除记录
-  if (path.match(/^\/api\/records\/([^/]+)$/) && method === 'DELETE') {
-    const id = path.match(/^\/api\/records\/([^/]+)$/)[1];
-    const idx = data.records.findIndex(r => r.id === id);
-    if (idx === -1) return sendJSON(res, 404, { error: '记录不存在' });
     
-    data.records.splice(idx, 1);
-    saveData(data);
-    return sendJSON(res, 200, { success: true });
-  }
-
-  // PUT /api/records/pay-all — 全部已付
-  if (path === '/api/records/pay-all' && method === 'PUT') {
-    data.records.forEach(r => { if (r.status === '未付') r.status = '已付'; });
-    saveData(data);
-    return sendJSON(res, 200, { success: true, count: data.records.length });
-  }
-
-  // GET /api/shops — 获取商家列表
-  if (path === '/api/shops' && method === 'GET') {
-    return sendJSON(res, 200, { shops: data.shops });
-  }
-
-  // POST /api/shops — 添加商家
-  if (path === '/api/shops' && method === 'POST') {
-    try {
-      const body = await parseBody(req);
-      const name = body.name?.trim();
-      if (!name) return sendJSON(res, 400, { error: '请输入商家名称' });
-      if (data.shops.includes(name)) return sendJSON(res, 400, { error: '商家已存在' });
-
-      data.shops.push(name);
-      saveData(data);
-      return sendJSON(res, 200, { success: true, name });
-    } catch (e) {
-      return sendJSON(res, 400, { error: e.message });
+    // DELETE /api/records (clear all)
+    if (pathname === '/api/records' && method === 'DELETE') {
+      clearAllRecords();
+      return sendJSON(res, 200, { success: true });
     }
-  }
-
-  // DELETE /api/shops/:name — 删除商家
-  if (path.startsWith('/api/shops/') && method === 'DELETE') {
-    const name = decodeURIComponent(path.replace('/api/shops/', ''));
-    const idx = data.shops.indexOf(name);
-    if (idx === -1) return sendJSON(res, 404, { error: '商家不存在' });
     
-    data.shops.splice(idx, 1);
-    saveData(data);
-    return sendJSON(res, 200, { success: true });
+    // PUT /api/records/pay-all
+    if (pathname === '/api/records/pay-all' && method === 'PUT') {
+      const count = payAllDebt();
+      return sendJSON(res, 200, { success: true, count });
+    }
+    
+    // PUT /api/records/:id/toggle-status
+    const toggleMatch = pathname.match(/^\/api\/records\/([^/]+)\/toggle-status$/);
+    if (toggleMatch && method === 'PUT') {
+      const result = toggleRecordStatus(toggleMatch[1]);
+      if (!result) return sendJSON(res, 404, { error: '记录不存在' });
+      return sendJSON(res, 200, { success: true, record: result });
+    }
+    
+    // DELETE /api/records/:id
+    const deleteMatch = pathname.match(/^\/api\/records\/([^/]+)$/);
+    if (deleteMatch && method === 'DELETE') {
+      deleteRecord(deleteMatch[1]);
+      return sendJSON(res, 200, { success: true });
+    }
+    
+    // GET /api/summary
+    if (pathname === '/api/summary' && method === 'GET') {
+      return sendJSON(res, 200, getSummary());
+    }
+    
+    // GET /api/dates
+    if (pathname === '/api/dates' && method === 'GET') {
+      return sendJSON(res, 200, { dates: getDates() });
+    }
+    
+    // GET /api/export
+    if (pathname === '/api/export' && method === 'GET') {
+      const all = getAllRecordsForExport();
+      let csv = '\uFEFF日期,时间,商家,菜品,斤数,进价(元/斤),总金额(元),状态\n';
+      all.forEach(r => {
+        csv += `${r.date},${r.time||''},${r.shop},${r.food},${r.weight},${r.price},${r.money},${r.status}\n`;
+      });
+      res.writeHead(200, {
+        'Content-Type': 'text/csv; charset=utf-8',
+        'Content-Disposition': `attachment; filename="生鲜台账_${new Date().toISOString().slice(0, 10)}.csv"`
+      });
+      return res.end(csv);
+    }
+    
+    // GET /api/admin/stats
+    if (pathname === '/api/admin/stats' && method === 'GET') {
+      return sendJSON(res, 200, getAdminStats());
+    }
+    
+    // GET /api/localtime — 返回服务器时间（供前端同步）
+    if (pathname === '/api/localtime' && method === 'GET') {
+      return sendJSON(res, 200, {
+        serverTime: new Date().toISOString(),
+        localDate: getLocalDateStr(new Date()),
+        localTime: getLocalTimeStr(new Date())
+      });
+    }
+    
+    // 管理后台页面
+    if (pathname === '/admin' || pathname.startsWith('/admin/')) {
+      const adminFile = pathname === '/admin' ? '/admin.html' : pathname;
+      return fs.readFile(path.join(__dirname, 'public', adminFile), (err, d) => {
+        if (err) return sendJSON(res, 404, { error: 'Admin page not found' });
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+        res.end(d);
+      });
+    }
+    
+    sendJSON(res, 404, { error: 'API not found' });
+  } catch (e) {
+    sendJSON(res, 500, { error: e.message });
   }
-
-  // GET /api/summary — 获取今日概览 & 欠款汇总
-  if (path === '/api/summary' && method === 'GET') {
-    const today = new Date().toLocaleDateString('zh-CN');
-    const todayRecords = data.records.filter(r => r.date === today);
-    const unpayRecords = data.records.filter(r => r.status === '未付');
-
-    const debtByShop = {};
-    unpayRecords.forEach(r => {
-      debtByShop[r.shop] = (debtByShop[r.shop] || 0) + r.money;
-    });
-
-    return sendJSON(res, 200, {
-      today: {
-        count: todayRecords.length,
-        total: todayRecords.reduce((s, r) => s + r.money, 0)
-      },
-      debt: {
-        total: unpayRecords.reduce((s, r) => s + r.money, 0),
-        byShop: debtByShop
-      },
-      totalRecords: data.records.length
-    });
-  }
-
-  // GET /api/dates — 获取所有日期
-  if (path === '/api/dates' && method === 'GET') {
-    const dates = [...new Set(data.records.map(r => r.date))].sort((a, b) => new Date(b) - new Date(a));
-    return sendJSON(res, 200, { dates });
-  }
-
-  // GET /api/export — 导出 CSV
-  if (path === '/api/export' && method === 'GET') {
-    let csv = '\uFEFF日期,时间,商家,菜品,斤数,进价(元/斤),总金额(元),状态\n';
-    data.records.forEach(r => {
-      csv += `${r.date},${r.time||''},${r.shop},${r.food},${r.weight},${r.price},${r.money},${r.status}\n`;
-    });
-    res.writeHead(200, {
-      'Content-Type': 'text/csv; charset=utf-8',
-      'Content-Disposition': `attachment; filename="生鲜台账_${new Date().toISOString().slice(0, 10)}.csv"`
-    });
-    res.end(csv);
-    return;
-  }
-
-  // DELETE /api/records — 清空所有记录
-  if (path === '/api/records' && method === 'DELETE') {
-    data.records = [];
-    saveData(data);
-    return sendJSON(res, 200, { success: true });
-  }
-
-  // 管理后台 API
-  // GET /api/admin/stats — 管理统计
-  if (path === '/api/admin/stats' && method === 'GET') {
-    const unpayCount = data.records.filter(r => r.status === '未付').length;
-    const topShops = {};
-    data.records.forEach(r => {
-      topShops[r.shop] = (topShops[r.shop] || 0) + r.money;
-    });
-    const topShopList = Object.entries(topShops)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 10)
-      .map(([shop, total]) => ({ shop, total: Math.round(total * 100) / 100 }));
-
-    return sendJSON(res, 200, {
-      totalRecords: data.records.length,
-      totalShops: data.shops.length,
-      unpayCount,
-      totalSpent: Math.round(data.records.reduce((s, r) => s + r.money, 0) * 100) / 100,
-      topShops: topShopList
-    });
-  }
-
-  // 管理后台页面
-  if (path === '/admin' || path.startsWith('/admin/')) {
-    const adminFile = path === '/admin' ? '/admin.html' : path;
-    fs.readFile(path.join(__dirname, 'public', adminFile), (err, d) => {
-      if (err) {
-        return sendJSON(res, 404, { error: 'Admin page not found' });
-      }
-      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-      res.end(d);
-    });
-    return;
-  }
-
-  // 未匹配 API
-  sendJSON(res, 404, { error: 'API not found' });
 }
 
 // ====== 启动 ======
@@ -302,7 +398,7 @@ const server = http.createServer((req, res) => {
 
 server.listen(PORT, () => {
   console.log(`\n🥬 生鲜台账服务已启动！`);
-  console.log(`   前台记账: http://127.0.0.1:${PORT}/`);
-  console.log(`   管理后台: http://127.0.0.1:${PORT}/admin`);
-  console.log(`   数据文件: ${RECORDS_FILE}\n`);
+  console.log(`   前台记账: http://localhost:${PORT}/`);
+  console.log(`   管理后台: http://localhost:${PORT}/admin`);
+  console.log(`   数据库: ${DB_PATH}\n`);
 });
