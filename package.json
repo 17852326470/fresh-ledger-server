@@ -7,6 +7,6 @@
     "start": "node server.js"
   },
   "dependencies": {
-    "better-sqlite3": "^12.10.0"
+    "sql.js": "^1.13.0"
   }
 }

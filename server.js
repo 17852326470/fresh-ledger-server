@@ -9,8 +9,9 @@ const DB_PATH = path.join(DATA_DIR, 'ledger.db');
 const PORT = process.env.PORT || 3100;
 
 // ====== 管理后台 Basic Auth ======
-const ADMIN_USER = '123456';
-const ADMIN_PASS = '123456';
+const ADMIN_USER = process.env.ADMIN_USER || '123456';
+const ADMIN_PASS = process.env.ADMIN_PASS || '123456';
+
 
 // ====== SQLite 数据库(使用 sql.js,纯 JS 无需编译) ======
 let db;
