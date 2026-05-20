@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>呱呱超市</title>
+<link rel="icon" href="/favicon.png" sizes="32x32">
+<link rel="apple-touch-icon" href="/favicon.png">
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+  background: linear-gradient(135deg, #ff6b35 0%, #ff8c5a 50%, #ffb088 100%);
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.container {
+  text-align: center;
+  padding: 30px;
+  width: 100%;
+  max-width: 400px;
+}
+.logo {
+  font-size: 64px;
+  margin-bottom: 10px;
+}
+.title {
+  color: white;
+  font-size: 28px;
+  font-weight: bold;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.2);
+  margin-bottom: 6px;
+}
+.subtitle {
+  color: rgba(255,255,255,0.8);
+  font-size: 14px;
+  margin-bottom: 40px;
+}
+.card {
+  background: white;
+  border-radius: 16px;
+  padding: 18px 20px;
+  margin-bottom: 12px;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  cursor: pointer;
+  transition: transform 0.1s, box-shadow 0.1s;
+  text-decoration: none;
+  color: #333;
+}
+.card:active {
+  transform: scale(0.98);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+.card-icon {
+  font-size: 36px;
+  width: 50px;
+  text-align: center;
+}
+.card-content {
+  flex: 1;
+  text-align: left;
+}
+.card-content .name {
+  font-size: 17px;
+  font-weight: 600;
+  color: #333;
+}
+.card-content .desc {
+  font-size: 13px;
+  color: #999;
+  margin-top: 3px;
+}
+.card-arrow {
+  font-size: 20px;
+  color: #ccc;
+}
+.footer {
+  color: rgba(255,255,255,0.5);
+  font-size: 12px;
+  margin-top: 30px;
+}
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="logo"><img src="/logo-hd.png" style="width:80px;height:80px;border-radius:50%"></div>
+  <div class="title">呱呱超市</div>
+  <div class="subtitle">请选择您的身份</div>
+
+  <a class="card" href="/index.html">
+    <div class="card-icon">🏪</div>
+    <div class="card-content">
+      <div class="name">采购人员</div>
+      <div class="desc">记录采购进货、查看今日清单、欠款管理</div>
+    </div>
+    <div class="card-arrow">→</div>
+  </a>
+
+  <a class="card" href="/kitchen">
+    <div class="card-icon">🍳</div>
+    <div class="card-content">
+      <div class="name">后厨人员</div>
+      <div class="desc">领菜登记、明日报菜</div>
+    </div>
+    <div class="card-arrow">→</div>
+  </a>
+
+  <a class="card" href="/stock-check.html">
+    <div class="card-icon">📦</div>
+    <div class="card-content">
+      <div class="name">库存核对</div>
+      <div class="desc">包装员录冷库 · 理货员核货架 · 采购看建议单</div>
+    </div>
+    <div class="card-arrow">→</div>
+  </a>
+
+  <a class="card" href="/admin">
+    <div class="card-icon">📊</div>
+    <div class="card-content">
+      <div class="name">管理人员</div>
+      <div class="desc">日报统计、月度报表、采购清单、商家管理</div>
+    </div>
+    <div class="card-arrow">→</div>
+  </a>
+
+  <div class="footer"><img src="/favicon.png" style="width:20px;height:20px;vertical-align:middle;border-radius:50%"> 呱呱超市 · 内部系统</div>
+</div>
+</body>
+</html>

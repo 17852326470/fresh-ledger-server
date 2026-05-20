@@ -1,0 +1,13 @@
+{
+  "name": "fresh-ledger",
+  "version": "1.0.0",
+  "description": "生鲜每日进货台账 - Server Edition",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "better-sqlite3": "^12.10.0",
+    "sql.js": "^1.14.1"
+  }
+}

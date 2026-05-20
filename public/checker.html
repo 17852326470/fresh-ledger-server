@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+ <meta charset="UTF-8">
+ <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+ <title>呱呱超市 · 货架核对</title>
+<link rel="icon" href="/favicon.png" sizes="32x32">
+<link rel="apple-touch-icon" href="/favicon.png">
+ <style>
+ * { box-sizing: border-box; margin: 0; padding: 0; }
+ body {
+  font-family: -apple-system, BlinkMacSystemFont, "微软雅黑", sans-serif;
+  max-width: 450px;
+  margin: 0 auto;
+  background: #f5f5f5;
+  padding: 10px 10px 30px;
+  font-size: 15px;
+ }
+ .title { text-align: center; font-size: 20px; color: #3b82f6; font-weight: bold; margin: 8px 0; }
+ .shop-badge { text-align: center; font-size: 14px; color: #999; margin-bottom: 10px; }
+ .card { background: white; border-radius: 10px; padding: 14px; margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+ h3 { font-size: 16px; font-weight: 600; color: #333; margin-bottom: 10px; border-left: 4px solid #3b82f6; padding-left: 8px; }
+ input {
+  width: 100%; padding: 10px; margin: 4px 0 8px; border: 1px solid #ddd; border-radius: 6px;
+  font-size: 15px; background: #fafafa;
+ }
+ input:focus { outline: none; border-color: #3b82f6; background: #fff; }
+ select {
+  padding: 6px; border: 1px solid #ddd; border-radius: 6px; background: #fafafa; font-size: 12px;
+ }
+ .status-bar {
+  background: #fff3cd; border-radius: 8px; padding: 8px 12px;
+  font-size: 12px; color: #856404; text-align: center; margin-bottom: 10px;
+ }
+ .status-bar.saved { background: #d4edda; color: #155724; }
+ .btn {
+  background: #3b82f6; color: white; border: none; border-radius: 6px;
+  padding: 10px 16px; font-size: 15px; font-weight: 600; cursor: pointer; width: 100%; margin: 4px 0;
+ }
+ .btn:active { opacity: 0.8; }
+ .btn-green { background: #28a745; }
+ .btn-outline { background: white; border: 1px solid #ddd; color: #333; }
+ .btn-sm { padding: 6px 10px; font-size: 13px; width: auto; display: inline-block; }
+ .stock-row {
+  display: flex; gap: 6px; align-items: center; padding: 8px 0;
+  border-bottom: 1px solid #f0f0f0; flex-wrap: wrap;
+ }
+ .stock-row:last-child { border-bottom: none; }
+ .stock-row .food-name { flex: 1; font-weight: 600; font-size: 15px; min-width: 60px; }
+ .stock-row .food-inputs { display: flex; gap: 4px; align-items: center; }
+ .stock-row input[type=number] { width: 55px; margin: 0; padding: 6px; font-size: 13px; }
+ .info-text {
+  background: #eff6ff; border-radius: 8px; padding: 10px; font-size: 13px;
+  color: #3b82f6; line-height: 1.6; margin-bottom: 10px;
+ }
+ .back-link { text-align: center; margin: 15px 0; font-size: 13px; }
+ .back-link a { color: #999; text-decoration: none; }
+ .back-link a:hover { color: #3b82f6; }
+ .tag-done { display:none; }
+ .date-picker { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; }
+ .date-picker input { flex: 1; padding: 8px; font-size: 14px; border: 1px solid #ddd; border-radius: 6px; }
+ .date-picker button { white-space: nowrap; padding: 8px 12px; width: auto; margin: 0; }
+ </style>
+</head>
+<body>
+
+<div class="title">📋 理货员 · 货架核对</div>
+<div class="shop-badge" id="shopBadge">🏪 1店</div>
+
+<div class="date-picker">
+  <input type="date" id="datePicker">
+  <button class="btn btn-sm btn-outline" onclick="loadData()">加载</button>
+</div>
+
+<div class="status-bar" id="statusBar">📝 加载冷库数据...</div>
+
+<!-- 冷库数据参考 -->
+<div class="card">
+  <h3>🧊 冷库库存（包装员录入）</h3>
+  <div id="coldStockRef"></div>
+</div>
+
+<!-- 货架核对 -->
+<div class="card">
+  <h3>🔍 货架核对</h3>
+  <div class="info-text">
+    • <strong>填数</strong> → 手动输入或选快捷<br>
+    • <strong>还有剩余</strong> → 填货架上的数量<br>
+    • <strong>冷库没有但你发现有的</strong> → 下面手动添加
+  </div>
+  <div id="shelfList"></div>
+  <div style="margin-top:8px;padding-top:8px;border-top:1px solid #eee">
+    <div style="display:flex;gap:6px;margin-bottom:6px">
+      <input type="text" id="addFood" placeholder="补充菜品" style="flex:1;margin:0">
+      <input type="number" step="0.5" min="0" id="addQtyNum" placeholder="件数" style="width:60px;margin:0">
+      <select id="addQtySelect" style="width:50px;margin:0;padding:6px;font-size:11px">
+        <option value="">快捷</option>
+        <option value="0">无</option>
+        <option value="0.5">半件</option>
+        <option value="1">1件</option>
+        <option value="2">2件</option>
+        <option value="3">3件</option>
+        <option value="4">4件</option>
+        <option value="5">5件</option>
+      </select>
+    </div>
+    <button class="btn btn-sm btn-outline" onclick="addItem()" style="width:100%">➕ 补充菜品</button>
+  </div>
+</div>
+
+<button class="btn btn-green" onclick="submitData()">✅ 提交核对结果</button>
+
+<div class="back-link"><a href="/stock-check.html">← 返回选择身份</a></div>
+
+<script>
+const shopNames = {1:'慧谷店',2:'储庄店'};
+const shop = parseInt(new URLSearchParams(window.location.search).get('shop')) || 1;
+document.getElementById('shopBadge').textContent = '🏪 ' + shopNames[shop];
+document.getElementById('datePicker').value = getTodayDate();
+
+let ALL_VEGGIES = [];
+
+// 存储肉的状态
+const shelfState = {}; // food -> { action: 'filled'|'no_need', qty: number }
+
+function getTodayDate() {
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+
+function toSlashDate(iso) {
+  const parts = iso.split('-');
+  return parts[0] + '/' + parseInt(parts[1]) + '/' + parseInt(parts[2]);
+}
+
+const UNITS = ['件', '斤', '包', '袋', '盒', '箱', '个'];
+function unitSelectHtml(selected) {
+  let h = '<select class="unit-select" style="width:52px;margin:0;padding:6px;font-size:12px">';
+  UNITS.forEach(u => h += '<option value="' + u + '"' + (u === selected ? ' selected' : '') + '>' + u + '</option>');
+  h += '</select>';
+  return h;
+}
+
+const shelfEl = document.getElementById('shelfList');
+const statusBar = document.getElementById('statusBar');
+const coldRefEl = document.getElementById('coldStockRef');
+
+function buildRow(food) {
+  const state = shelfState[food] || {};
+  const val = state.qty !== undefined ? state.qty : '';
+  const unit = state.unit || '件';
+
+  return '<span class="food-name">' + food + '</span>' +
+    '<div class="food-inputs">' +
+      '<input type="number" step="0.5" min="0" class="shelf-qty" value="' + val + '" placeholder="剩几件" style="width:55px;margin:0;padding:6px;font-size:13px">' +
+      unitSelectHtml(unit) +
+      '<select style="width:50px;margin:0;padding:6px;font-size:11px" onchange="quickFill(this, \'' + food + '\')">' +
+        '<option value="">快捷</option>' +
+        '<option value="0">无</option>' +
+        '<option value="0.5">0.5</option>' +
+        '<option value="1">1</option>' +
+        '<option value="2">2</option>' +
+        '<option value="3">3</option>' +
+        '<option value="4">4</option>' +
+        '<option value="5">5</option>' +
+      '</select>' +
+    '</div>';
+}
+
+function renderShelf() {
+  shelfEl.innerHTML = '';
+  ALL_VEGGIES.forEach(food => {
+    const row = document.createElement('div');
+    row.className = 'stock-row';
+    row.id = 'row-' + food.replace(/\s/g, '_');
+    row.innerHTML = buildRow(food);
+    shelfEl.appendChild(row);
+  });
+  
+  // 额外显示：当天录入但不在预制列表的菜品
+  if (typeof shelfState !== 'undefined' && shelfState) {
+    Object.keys(shelfState).forEach(food => {
+      if (!ALL_VEGGIES.includes(food)) {
+        const state = shelfState[food];
+        const unit = state?.unit || '件';
+        const row = document.createElement('div');
+        row.className = 'stock-row';
+        row.id = 'row-' + food.replace(/\s/g, '_');
+        row.innerHTML =
+          '<span class="food-name">' + food + ' <span style="font-size:11px;color:#3b82f6;font-weight:normal">🆕</span></span>' +
+          '<div class="food-inputs">' +
+            '<input type="number" step="0.5" min="0" class="shelf-qty" value="' + (state ? state.qty : '') + '" placeholder="剩几件" style="width:55px;margin:0;padding:6px;font-size:13px">' +
+            unitSelectHtml(unit) +
+            '<select style="width:50px;margin:0;padding:6px;font-size:11px" onchange="quickFill(this, \'' + food + '\')">' +
+              '<option value="">快捷</option>' +
+              '<option value="0">无</option>' +
+              '<option value="0.5">0.5</option>' +
+              '<option value="1">1</option>' +
+              '<option value="2">2</option>' +
+              '<option value="3">3</option>' +
+              '<option value="4">4</option>' +
+              '<option value="5">5件</option>' +
+            '</select>' +
+            '<span style="font-size:12px;color:#999">件</span>' +
+          '</div>';
+        shelfEl.appendChild(row);
+      }
+    });
+  }
+}
+
+function quickFill(sel, food) {
+  const val = sel.value;
+  if (val === '') return;
+  const row = document.getElementById('row-' + food.replace(/\s/g, '_'));
+  const input = row.querySelector('.shelf-qty');
+  if (input) input.value = val;
+  // 如果选"无"，表示肯定要买
+  if (val === '0') {
+    shelfState[food] = { action: 'filled', qty: 0 };
+  } else {
+    shelfState[food] = { action: 'filled', qty: parseFloat(val) };
+  }
+  sel.value = '';
+}
+
+function addItem() {
+  const food = document.getElementById('addFood').value.trim();
+  const qtyNum = document.getElementById('addQtyNum').value;
+  const qtySelect = document.getElementById('addQtySelect').value;
+  if (!food) return;
+
+  if (qtyNum || qtySelect) {
+    const qty = qtyNum || qtySelect;
+    shelfState[food] = { action: 'filled', qty: parseFloat(qty) };
+  }
+
+  // 检查是否已存在在列表中
+  const existing = document.getElementById('row-' + food.replace(/\s/g, '_'));
+  if (existing) {
+    existing.innerHTML = buildRow(food);
+    existing.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  } else {
+    // 加到 ALL_VEGGIES 末尾展示
+    const row = document.createElement('div');
+    row.className = 'stock-row';
+    row.id = 'row-' + food.replace(/\s/g, '_');
+    row.innerHTML = buildRow(food);
+    shelfEl.appendChild(row);
+  }
+
+  document.getElementById('addFood').value = '';
+  document.getElementById('addQtyNum').value = '';
+  document.getElementById('addQtySelect').value = '';
+}
+
+function getStateFromDOM() {
+  const rows = shelfEl.querySelectorAll('.stock-row');
+  const items = [];
+  rows.forEach(row => {
+    const food = row.querySelector('.food-name')?.textContent?.trim();
+    if (!food) return;
+
+    // 从 shelfState 或 DOM 读取
+    const state = shelfState[food];
+    if (state) {
+      const qty = state.qty || 0;
+      const unit = state.unit || '件';
+      items.push({ food, cold_qty: 0, shelf_action: 'filled', shelf_qty: qty, unit });
+    } else {
+      // 从 DOM 读取
+      const qtyInput = row.querySelector('.shelf-qty');
+      const qty = qtyInput ? parseFloat(qtyInput.value) : null;
+      const unit = row.querySelector('.unit-select')?.value || '件';
+      if (qty !== null && !isNaN(qty) && qty >= 0) {
+        items.push({ food, cold_qty: 0, shelf_action: 'filled', shelf_qty: qty, unit });
+      }
+    }
+  });
+  return items;
+}
+
+async function loadData() {
+  const date = toSlashDate(document.getElementById('datePicker').value);
+  statusBar.textContent = '⏳ 加载中...';
+  statusBar.className = 'status-bar';
+  coldRefEl.innerHTML = '<div style="color:#999;padding:6px">⏳ 加载中...</div>';
+
+  try {
+    const resp = await fetch('/api/stock-check/shelf?date=' + encodeURIComponent(date) + '&shop=' + shop);
+    const data = await resp.json();
+
+    // 冷库参考
+    if (data.coldItems.length === 0) {
+      coldRefEl.innerHTML = '<div style="color:#999;padding:6px">暂无冷库数据</div>';
+    } else {
+      coldRefEl.innerHTML = data.coldItems.map(c =>
+        '<div style="padding:6px 0;border-bottom:1px solid #f0f0f0;font-size:14px">' +
+          '<strong>' + c.food + '</strong>：' + (c.qty === 0.5 ? '半' : c.qty) + ' 件</div>'
+      ).join('');
+    }
+
+    // 货架数据
+    Object.keys(shelfState).forEach(k => delete shelfState[k]);
+    data.items.forEach(i => {
+      shelfState[i.food] = { action: i.shelf_action, qty: i.shelf_qty, unit: i.unit || '' };
+    });
+    renderShelf();
+
+    statusBar.textContent = '📋 已加载 ' + date + ' 的数据，冷库 ' + data.coldItems.length + ' 条';
+    statusBar.className = 'status-bar';
+  } catch (e) {
+    statusBar.textContent = '❌ 加载失败: ' + e.message;
+    statusBar.className = 'status-bar';
+    coldRefEl.innerHTML = '<div style="color:#dc3545;padding:6px">加载失败</div>';
+    renderShelf();
+  }
+}
+
+async function submitData() {
+  const date = toSlashDate(document.getElementById('datePicker').value);
+  const items = getStateFromDOM();
+
+  if (items.length === 0) {
+    statusBar.textContent = '⚠️ 请至少核对一个菜品';
+    statusBar.className = 'status-bar';
+    return;
+  }
+
+  statusBar.textContent = '⏳ 提交中...';
+  statusBar.className = 'status-bar';
+
+  try {
+    const resp = await fetch('/api/stock-check/shelf', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ date, shop, items })
+    });
+    const result = await resp.json();
+    if (result.success) {
+      statusBar.textContent = '✅ 已保存！共 ' + result.count + ' 条记录';
+      statusBar.className = 'status-bar saved';
+      document.querySelector('.btn-green').disabled = true;
+      document.querySelector('.btn-green').textContent = '✅ 已保存';
+      setTimeout(() => { window.location.reload(); }, 1500);
+    } else {
+      statusBar.textContent = '❌ 提交失败: ' + (result.error || '未知错误');
+      statusBar.className = 'status-bar';
+    }
+  } catch (e) {
+    statusBar.textContent = '❌ 提交失败: ' + e.message;
+    statusBar.className = 'status-bar';
+  }
+}
+
+// 初始加载 - 先从API获取完整菜品列表
+async function init() {
+  try {
+    const resp = await fetch('/api/foods?preset=true');
+    const data = await resp.json();
+    ALL_VEGGIES = data.foods || [];
+  } catch(e) {
+    console.log('加载菜品列表失败:', e);
+  }
+  renderShelf();
+  loadData();
+}
+init();
+</script>
+</body>
+</html>

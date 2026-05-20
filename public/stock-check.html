@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+ <meta charset="UTF-8">
+ <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+ <title>呱呱超市 · 库存核对</title>
+<link rel="icon" href="/favicon.png" sizes="32x32">
+<link rel="apple-touch-icon" href="/favicon.png">
+ <style>
+ * { box-sizing: border-box; margin: 0; padding: 0; }
+ body {
+  font-family: -apple-system, BlinkMacSystemFont, "微软雅黑", sans-serif;
+  max-width: 450px;
+  margin: 0 auto;
+  background: #f5f5f5;
+  padding: 10px;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+ }
+ .container { width: 100%; text-align: center; }
+ .title { font-size: 24px; color: #ff6b35; font-weight: bold; margin-bottom: 6px; }
+ .subtitle { font-size: 14px; color: #999; margin-bottom: 24px; }
+ .role-grid { display: flex; gap: 10px; margin: 0 0 20px; }
+ .role-card {
+  flex: 1; padding: 24px 10px; border-radius: 12px;
+  background: white; border: 2px solid #eee; cursor: pointer; transition: all 0.2s;
+  text-align: center;
+ }
+ .role-card:active { transform: scale(0.97); }
+ .role-card.selected { border-color: #ff6b35; background: #fff8f5; }
+ .role-card .icon { font-size: 40px; margin-bottom: 8px; }
+ .role-card .name { font-size: 16px; font-weight: 600; color: #333; }
+ .role-card .desc { font-size: 12px; color: #999; margin-top: 4px; }
+ .shop-grid { display: flex; gap: 10px; margin: 0 0 20px; }
+ .shop-card {
+  flex: 1; padding: 24px 10px; border-radius: 12px;
+  background: white; border: 2px solid #eee; cursor: pointer; transition: all 0.2s;
+  text-align: center;
+ }
+ .shop-card:active { transform: scale(0.97); }
+ .shop-card.selected { border-color: #3b82f6; background: #f0f7ff; }
+ .shop-card .icon { font-size: 40px; margin-bottom: 8px; }
+ .shop-card .name { font-size: 18px; font-weight: 600; }
+ .section-title { font-size: 16px; font-weight: 600; color: #333; margin-bottom: 12px; }
+ .btn {
+  background: #ff6b35; color: white; border: none; border-radius: 8px;
+  padding: 12px 24px; font-size: 16px; font-weight: 600; cursor: pointer; width: 100%;
+ }
+ .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+ .btn:active:not(:disabled) { opacity: 0.8; }
+ .back-link { margin-top: 20px; font-size: 13px; }
+ .back-link a { color: #999; text-decoration: none; }
+ .back-link a:hover { color: #ff6b35; }
+ .hidden { display: none; }
+ </style>
+</head>
+<body>
+<div class="container">
+  <div class="title">📦 库存核对</div>
+  <div class="subtitle">请先选择身份和店铺</div>
+
+  <!-- 步骤1：选身份 -->
+  <div class="section-title">一、您是谁？</div>
+  <div class="role-grid">
+    <div class="role-card" onclick="selectRole('packer')" id="role-packer">
+      <div class="icon">🧊</div>
+      <div class="name">包装员</div>
+      <div class="desc">记录冷库库存</div>
+    </div>
+    <div class="role-card" onclick="selectRole('checker')" id="role-checker">
+      <div class="icon">📋</div>
+      <div class="name">理货员</div>
+      <div class="desc">核对货架库存</div>
+    </div>
+    <div class="role-card" onclick="selectRole('buyer')" id="role-buyer">
+      <div class="icon">🛒</div>
+      <div class="name">采购查看</div>
+      <div class="desc">查看建议采购单</div>
+    </div>
+  </div>
+
+  <!-- 步骤2：选店铺 -->
+  <div id="step-shop" class="hidden">
+    <div class="section-title">二、哪个店？</div>
+    <div class="shop-grid">
+      <div class="shop-card" onclick="selectShop(1)" id="shop-1">
+        <div class="icon">🏪</div>
+        <div class="name">慧谷店</div>
+      </div>
+      <div class="shop-card" onclick="selectShop(2)" id="shop-2">
+        <div class="icon">🏪</div>
+        <div class="name">储庄店</div>
+      </div>
+    </div>
+    <button class="btn" id="goBtn" disabled onclick="goToWork()">进入工作区 →</button>
+  </div>
+
+  <div class="back-link"><a href="/portal.html">← 返回首页</a></div>
+</div>
+
+<script>
+let currentRole = '';
+let currentShop = 0;
+
+function selectRole(role) {
+  currentRole = role;
+  document.querySelectorAll('.role-card').forEach(el => el.classList.remove('selected'));
+  document.getElementById('role-' + role).classList.add('selected');
+
+  // 采购查看不需要选店铺，直接跳转
+  if (role === 'buyer') {
+    window.location.href = '/buyer-view.html';
+    return;
+  }
+
+  document.getElementById('step-shop').classList.remove('hidden');
+  document.getElementById('step-shop').scrollIntoView({ behavior: 'smooth' });
+  updateGoBtn();
+}
+
+function selectShop(shop) {
+  currentShop = shop;
+  document.querySelectorAll('.shop-card').forEach(el => el.classList.remove('selected'));
+  document.getElementById('shop-' + shop).classList.add('selected');
+  updateGoBtn();
+}
+
+function updateGoBtn() {
+  document.getElementById('goBtn').disabled = !(currentRole && currentShop);
+}
+
+function goToWork() {
+  const pages = {
+    packer: '/packer.html?shop=' + currentShop,
+    checker: '/checker.html?shop=' + currentShop,
+    buyer: '/buyer-view.html'
+  };
+  window.location.href = pages[currentRole];
+}
+</script>
+</body>
+</html>

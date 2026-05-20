@@ -1,0 +1,1179 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>呱呱超市 · 管理后台</title>
+<link rel="icon" href="/favicon.png" sizes="32x32">
+<link rel="apple-touch-icon" href="/favicon.png">
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+  max-width: 500px; margin: 0 auto; padding: 20px;
+  background: #f5f5f5; font-size: 14px;
+}
+.login-box {
+  background: white; border-radius: 12px; padding: 30px 24px;
+  max-width: 320px; margin: 80px auto;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+  text-align: center;
+}
+.login-box h2 { color: #ff6b35; margin-bottom: 20px; }
+.login-box input {
+  width: 100%; padding: 12px; margin: 8px 0;
+  border: 1px solid #ddd; border-radius: 8px; font-size: 16px;
+}
+.login-box button {
+  width: 100%; padding: 12px; margin-top: 12px;
+  background: #ff6b35; color: white; border: none; border-radius: 8px;
+  font-size: 16px; cursor: pointer;
+}
+.login-box button:active { opacity: 0.8; }
+.error { color: red; font-size: 13px; margin-top: 8px; display: none; }
+.dashboard { display: none; }
+.card {
+  background: white; border-radius: 10px; padding: 14px;
+  margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
+h3 { font-size: 16px; color: #333; margin-bottom: 8px; border-left: 4px solid #ff6b35; padding-left: 8px; }
+.stat-row { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+.stat-card {
+  flex: 1; min-width: 100px; background: #fff3ee;
+  border-radius: 8px; padding: 12px; text-align: center;
+}
+.stat-card .num { font-size: 24px; font-weight: bold; color: #ff6b35; }
+.stat-card .label { font-size: 12px; color: #888; }
+.tab-bar { display: flex; gap: 2px; margin-bottom: 10px; }
+.tab {
+  flex: 1; text-align: center; padding: 8px; font-size: 13px;
+  background: #eee; border-radius: 8px 8px 0 0; cursor: pointer; color: #666;
+}
+.tab.active { background: white; color: #ff6b35; font-weight: bold; }
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+table { width: 100%; font-size: 13px; border-collapse: collapse; }
+th, td { padding: 6px 4px; text-align: left; border-bottom: 1px solid #eee; }
+th { color: #666; font-weight: 600; }
+.btn {
+  width: 100%; padding: 12px; margin: 4px 0;
+  background: #ff6b35; color: white; border: none; border-radius: 8px;
+  font-size: 15px; cursor: pointer;
+}
+.btn-sm { padding: 8px; font-size: 13px; }
+.btn-danger { background: #ff4444; }
+select {
+  width: 100%; padding: 10px; border: 1px solid #ddd;
+  border-radius: 8px; font-size: 14px; margin: 4px 0;
+}
+.row { display: flex; gap: 8px; margin-bottom: 6px; }
+.total-row { background: #fff3ee; padding: 10px; border-radius: 8px; margin: 8px 0; text-align: center; font-size: 16px; font-weight: bold; color: #ff6b35; }
+.empty { color: #ccc; text-align: center; padding: 20px; font-size: 13px; }
+.footer { text-align: center; font-size: 11px; color: #ccc; margin-top: 8px; }
+.logout { float: right; color: #999; font-size: 12px; cursor: pointer; }
+</style>
+</head>
+<body>
+
+<!-- 登录框 -->
+<div id="loginBox" class="login-box">
+<h2 style="display:flex;align-items:center;gap:8px"><img src="/favicon.png" style="width:24px;height:24px;border-radius:50%"> 管理后台</h2>
+  <input type="text" id="user" placeholder="用户名">
+  <input type="password" id="pass" placeholder="密码">
+  <button onclick="doLogin()">登录</button>
+  <div id="loginError" class="error">账号或密码错误</div>
+</div>
+
+<!-- 管理面板 -->
+<div id="dashboard" class="dashboard">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+    <h2 style="color:#ff6b35;font-size:20px"><img src="/favicon.png" style="width:24px;height:24px;vertical-align:middle;border-radius:50%"> 管理后台</h2>
+    <span class="logout" onclick="logout()">退出</span>
+  </div>
+
+  <div class="tab-bar">
+    <div class="tab" onclick="switchTab('daily')">📋 日报</div>
+    <div class="tab" onclick="switchTab('monthly')">📅 月度统计</div>
+    <div class="tab" onclick="switchTab('shops')">🏪 商家管理</div>
+    <div class="tab" onclick="switchTab('stock')">📦 库存</div>
+    <div class="tab" onclick="switchTab('system')">⚙️ 系统</div>
+  </div>
+
+  <!-- Tab 1: 日报 -->
+  <div id="tab-daily" class="tab-content active">
+    <div class="card">
+      <h3>📅 选择日期</h3>
+      <select id="dailyDate" onchange="renderDaily()"></select>
+    </div>
+    <div class="card" style="padding:8px 14px">
+      <div style="display:flex;gap:6px">
+        <span id="dailyFilterAll" class="daily-filter" onclick="setDailyFilter('all')" style="flex:1;text-align:center;padding:6px;border-radius:6px;background:#ff6b35;color:white;font-size:13px;cursor:pointer">📊 全部</span>
+        <span id="dailyFilter自采" class="daily-filter" onclick="setDailyFilter('自采')" style="flex:1;text-align:center;padding:6px;border-radius:6px;background:#ddd;color:#666;font-size:13px;cursor:pointer">🏪 自采</span>
+        <span id="dailyFilter后厨" class="daily-filter" onclick="setDailyFilter('后厨')" style="flex:1;text-align:center;padding:6px;border-radius:6px;background:#ddd;color:#666;font-size:13px;cursor:pointer">🍳 后厨</span>
+      </div>
+    </div>
+    <div class="card">
+      <div class="stat-row">
+        <div class="stat-card"><div class="num" id="dWeight">0</div><div class="label">总斤数</div></div>
+        <div class="stat-card"><div class="num" id="dMoney">0</div><div class="label">总金额(元)</div></div>
+        <div class="stat-card"><div class="num" id="dAvg">0</div><div class="label">均价</div></div>
+        <div class="stat-card"><div class="num" id="dCount">0</div><div class="label">笔数</div></div>
+      </div>
+    </div>
+    <div class="card">
+      <h3>🏪 分商家</h3>
+      <table><thead><tr><th>商家</th><th>斤数</th><th>金额</th></tr></thead><tbody id="dShops"></tbody></table>
+    </div>
+    <div class="card">
+      <h3>🥬 各菜品</h3>
+      <table><thead><tr><th>菜品</th><th>斤数</th><th>金额</th><th>均价</th></tr></thead><tbody id="dFoods"></tbody></table>
+    </div>
+    <div class="card">
+      <h3>🍳 后厨</h3>
+      <div id="dKitchen"></div>
+    </div>
+  </div>
+
+  <!-- Tab 2: 月度统计 -->
+  <div id="tab-monthly" class="tab-content">
+    <div class="card">
+      <div class="row">
+        <select id="monthSelect" style="flex:2" onchange="renderMonthly()"></select>
+        <select id="monthType" style="flex:1" onchange="renderMonthly()">
+          <option value="">全部用途</option>
+          <option value="自采">🏪 自采</option>
+          <option value="后厨">🍳 后厨</option>
+        </select>
+      </div>
+    </div>
+    <div class="card">
+      <h3>📊 月度汇总</h3>
+      <div class="stat-row">
+        <div class="stat-card">
+          <div class="num" id="mTotalWeight">0</div>
+          <div class="label">总斤数</div>
+        </div>
+        <div class="stat-card">
+          <div class="num" id="mTotalMoney">0</div>
+          <div class="label">总金额(元)</div>
+        </div>
+        <div class="stat-card">
+          <div class="num" id="mAvgPrice">0</div>
+          <div class="label">平均进价</div>
+        </div>
+        <div class="stat-card">
+          <div class="num" id="mCount">0</div>
+          <div class="label">笔数</div>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <h3>🥬 各菜品明细</h3>
+      <table><thead><tr><th>菜品</th><th>斤数</th><th>总金额</th><th>均价</th><th>笔数</th></tr></thead>
+        <tbody id="mFoodDetail"></tbody>
+      </table>
+    </div>
+    <div class="card">
+      <h3>🏪 各商家明细</h3>
+      <table><thead><tr><th>商家</th><th>斤数</th><th>总金额</th><th>均价</th></tr></thead>
+        <tbody id="mShopDetail"></tbody>
+      </table>
+    </div>
+    <div class="card">
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn" onclick="exportMonthly()">📤 导出月度报表 (CSV)</button>
+        <button class="btn" onclick="matchPrices()" style="flex:1;background:#28a745">🔗 匹配后厨进价</button>
+      </div>
+      <div id="unmatchedPrices" style="margin-top:8px"></div>
+    </div>
+  </div>
+
+  <!-- Tab 3: 采购清单 -->
+  <div id="tab-procure" class="tab-content">
+    <div class="card">
+      <h3>📅 选择日期</h3>
+      <select id="procureDate" onchange="renderProcure()"></select>
+      
+    </div>
+    <div class="card">
+      <div class="stat-row">
+        <div class="stat-card"><div class="num" id="pItems">0</div><div class="label">菜品数</div></div>
+        <div class="stat-card"><div class="num" id="pWeight">0</div><div class="label">总数量</div></div>
+      </div>
+      <table><thead><tr><th>菜品</th><th>需求数量</th></tr></thead>
+        <tbody id="pList"></tbody>
+      </table>
+      <div style="margin-top:12px">
+        <button class="btn" onclick="exportProcure()">📤 导出采购清单 (CSV)</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tab 4: 商家管理 -->
+  <div id="tab-shops" class="tab-content">
+    <div class="card">
+      <h3>📝 添加商家</h3>
+      <div style="display:flex;gap:8px">
+        <input type="text" id="newShop" placeholder="输入商家名称" style="flex:1" onkeydown="if(event.key==='Enter')addShop()">
+        <button class="btn" onclick="addShop()" style="width:auto;padding:10px 20px">➕ 添加</button>
+      </div>
+    </div>
+    <div class="card">
+      <h3>🏪 商家列表</h3>
+      <div id="shopList"></div>
+    </div>
+  </div>
+  
+  <!-- Tab: 库存管理 -->
+  <div id="tab-stock" class="tab-content">
+    <div class="card">
+      <h3>📦 库存总览</h3>
+      <div style="display:flex;gap:8px;margin-bottom:10px">
+        <input type="date" id="stockDate" style="flex:1;padding:8px;border:1px solid #ddd;border-radius:8px;font-size:14px" onchange="loadStockOverview()">
+        <button class="btn" style="width:auto;padding:8px 16px" onclick="loadStockOverview()">🔄 刷新</button>
+      </div>
+      <div id="stockOverview" style="font-size:13px">
+        <div class="empty">请选择日期查看库存</div>
+      </div>
+    </div>
+    
+    <div class="card">
+      <h3>📥 导入销售数据（芯友CSV）</h3>
+      <div style="margin-bottom:8px;font-size:13px;color:#666">自动从文件名识别日期，重复导入会覆盖</div>
+      <input type="file" id="csvFile" accept=".csv,text/plain" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:8px;font-size:14px;background:white">
+      <button class="btn" onclick="importSalesFile()" style="margin-top:8px">📤 导入销售数据</button>
+      <div id="importResult" style="margin-top:8px;font-size:13px;color:#666"></div>
+    </div>
+  </div>
+
+  <!-- Tab 5: 系统管理 -->
+  <div id="tab-system" class="tab-content">
+    <div class="card">
+      <h3>⚙️ 系统管理</h3>
+      <div style="margin-bottom:12px">
+        <button class="btn" onclick="backupDB()" style="margin-bottom:8px">💾 备份数据库</button>
+        <div id="backupResult" style="font-size:13px;color:#666"></div>
+      </div>
+      <div>
+        <button class="btn" onclick="showStats()">📊 数据统计</button>
+        <div id="statsResult" style="margin-top:8px;font-size:13px"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer"><img src="/favicon.png" style="width:20px;height:20px;vertical-align:middle;border-radius:50%"> 呱呱超市 · 管理后台</div>
+</div>
+
+<script>
+const BASE = window.location.origin;
+let _auth = localStorage.getItem('ledger_auth');
+
+function doLogin() {
+  const user = document.getElementById('user').value;
+  const pass = document.getElementById('pass').value;
+  const auth = btoa(user + ':' + pass);
+  
+  fetch(BASE + '/api/admin/stats', {
+    headers: { 'Authorization': 'Basic ' + auth }
+  })
+  .then(r => {
+    if (!r.ok) throw new Error('认证失败');
+    return r.json();
+  })
+  .then(data => {
+    _auth = auth;
+    localStorage.setItem('ledger_auth', auth);
+    document.getElementById('loginBox').style.display = 'none';
+    document.getElementById('dashboard').style.display = 'block';
+    initDailyDate();
+  })
+  .catch(() => {
+    document.getElementById('loginError').style.display = 'block';
+  });
+}
+
+function logout() {
+  _auth = null;
+  localStorage.removeItem('ledger_auth');
+  document.getElementById('loginBox').style.display = 'block';
+  document.getElementById('dashboard').style.display = 'none';
+}
+
+// 页面加载时检查是否已有登录凭证
+(function() {
+  if (_auth) {
+    // 验证凭证是否仍然有效
+    fetch(BASE + '/api/admin/stats', {
+      headers: { 'Authorization': 'Basic ' + _auth }
+    })
+    .then(r => {
+      if (!r.ok) throw new Error('认证失效');
+      return r.json();
+    })
+    .then(data => {
+      document.getElementById('loginBox').style.display = 'none';
+      document.getElementById('dashboard').style.display = 'block';
+      initDailyDate();
+    })
+    .catch(() => {
+      _auth = null;
+      localStorage.removeItem('ledger_auth');
+    });
+  }
+})();
+
+function withAuth(fetchFn) {
+  return fetchFn().then(r => {
+    if (r.status === 401) { alert('登录已过期，请重新登录'); logout(); }
+    return r;
+  });
+}
+
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  document.querySelector(`.tab[onclick*="'${name}'"]`).classList.add('active');
+  document.getElementById('tab-' + name).classList.add('active');
+  if (name === 'daily') renderDaily();
+  if (name === 'monthly') renderMonthly();
+  if (name === 'procure') renderProcure();
+  if (name === 'shops') loadShops();
+  if (name === 'stock') initStockTab();
+}
+
+
+
+function exportAll() {
+  if (!_auth) return alert('请先登录');
+  window.open(BASE + '/api/export', '_blank');
+}
+
+function clearAll() {
+  if (!confirm('⚠️ 确定清空所有数据？此操作不可恢复！')) return;
+  if (!confirm('再次确认！')) return;
+  fetch(BASE + '/api/records', {
+    method: 'DELETE',
+    headers: { 'Authorization': 'Basic ' + _auth }
+  })
+  .then(r => r.json())
+  .then(d => {
+    if (d.success) { alert('已清空'); location.reload(); }
+  });
+}
+
+// ====== 日报 ======
+let _dailyFilter = 'all';
+
+function setDailyFilter(type) {
+  _dailyFilter = type;
+  document.querySelectorAll('.daily-filter').forEach(el => {
+    el.style.background = el.id === 'dailyFilter' + type ? '#ff6b35' : '#ddd';
+    el.style.color = el.id === 'dailyFilter' + type ? 'white' : '#666';
+  });
+  renderDaily();
+}
+
+function renderDaily() {
+  const select = document.getElementById('dailyDate');
+  if (select.options.length === 0) return;
+  const date = select.value;
+  if (!date) return;
+  
+  const headers = _auth ? { 'Authorization': 'Basic ' + _auth } : {};
+  
+  fetch(BASE + '/api/records?date=' + encodeURIComponent(date), { headers })
+  .then(r => r.json())
+  .then(d => {
+    let records = d.records || [];
+    
+    // 按筛选类型过滤
+    if (_dailyFilter === '自采') records = records.filter(r => r.type === '自采');
+    else if (_dailyFilter === '后厨') records = records.filter(r => r.type === '后厨');
+    
+    const totalWeight = records.reduce((s, r) => s + parseFloat(r.weight), 0);
+    const totalMoney = records.reduce((s, r) => s + r.money, 0);
+    document.getElementById('dWeight').textContent = totalWeight.toFixed(1);
+    document.getElementById('dMoney').textContent = totalMoney.toFixed(1);
+    document.getElementById('dAvg').textContent = totalWeight > 0 ? (totalMoney/totalWeight).toFixed(2) : '0';
+    document.getElementById('dCount').textContent = records.length;
+    
+    // 分商家
+    const byShop = {};
+    records.forEach(r => {
+      if (!byShop[r.shop]) byShop[r.shop] = { weight: 0, money: 0 };
+      byShop[r.shop].weight += parseFloat(r.weight);
+      byShop[r.shop].money += r.money;
+    });
+    document.getElementById('dShops').innerHTML = Object.keys(byShop).sort((a,b) => byShop[b].money - byShop[a].money)
+      .map(s => `<tr><td>${s}</td><td>${byShop[s].weight.toFixed(1)}</td><td>${byShop[s].money.toFixed(1)}</td></tr>`).join('');
+    
+    // 各菜品
+    const byFood = {};
+    records.forEach(r => {
+      if (!byFood[r.food]) byFood[r.food] = { weight: 0, money: 0 };
+      byFood[r.food].weight += parseFloat(r.weight);
+      byFood[r.food].money += r.money;
+    });
+    document.getElementById('dFoods').innerHTML = Object.keys(byFood).sort((a,b) => byFood[b].money - byFood[a].money)
+      .map(f => `<tr><td>${f}</td><td>${byFood[f].weight.toFixed(1)}</td><td>${byFood[f].money.toFixed(1)}</td><td>${(byFood[f].money/byFood[f].weight).toFixed(2)}</td></tr>`).join('');
+    
+    // 后厨
+    const kitchen = records.filter(r => r.type === '后厨');
+    const noPriceKitchen = kitchen.filter(r => r.price == 0);
+    let kitchenHtml;
+    if (kitchen.length === 0) {
+      kitchenHtml = '<span style="color:#ccc">今日无后厨记录</span>';
+    } else {
+      kitchenHtml = kitchen.map(r => {
+        if (r.price == 0) {
+          return '<div style="display:flex;align-items:center;gap:6px;margin:4px 0">🍳 <strong>' + r.food + '</strong> ' + r.weight + (r.unit || '斤') +
+            ' ⚠️ 进价: <input id="kp_' + r.id + '" type="number" step="0.01" style="width:70px;padding:4px;border:1px solid #ddd;border-radius:4px;font-size:13px" placeholder="0"> 元/' + (r.unit || '斤') +
+            ' <button onclick="setKitchenPrice(\'' + r.id + '\',\'' + r.food + '\',\'' + r.weight + '\',\'' + (r.unit || '斤') + '\')" style="padding:4px 8px;border:none;border-radius:4px;background:#28a745;color:white;font-size:12px;cursor:pointer">确认</button></div>';
+        } else {
+          return '<div>🍳 ' + r.food + ' ' + r.weight + (r.unit || '斤') + ' × ' + r.price + '元/' + (r.unit || '斤') + ' = ' + r.money + '元</div>';
+        }
+      }).join('');
+    }
+    document.getElementById('dKitchen').innerHTML = kitchenHtml;
+  });
+}
+
+function setKitchenPrice(id, food, weight, unit) {
+  const input = document.getElementById('kp_' + id);
+  const price = parseFloat(input.value);
+  if (isNaN(price) || price <= 0) return alert('请输入有效的价格');
+  const money = Math.round(weight * price * 100) / 100;
+  const headers = _auth ? { 'Authorization': 'Basic ' + _auth } : {};
+  fetch(BASE + '/api/records/' + id, {
+    method: 'PUT',
+    headers: Object.assign({ 'Content-Type': 'application/json' }, headers),
+    body: JSON.stringify({ price: price, money: money })
+  })
+  .then(r => { if (!r.ok) throw new Error('更新失败'); return r.json(); })
+  .then(function() {
+    renderDaily();
+    loadUnmatchedPrices();
+  })
+  .catch(function(e) { alert('设置失败：' + e.message); });
+}
+
+function initDailyDate() {
+  fetch(BASE + '/api/dates', { headers: _auth ? { 'Authorization': 'Basic ' + _auth } : {} })
+  .then(r => r.json())
+  .then(d => {
+    const select = document.getElementById('dailyDate');
+    select.innerHTML = (d.dates || []).map(dt => `<option value="${dt}">${dt}</option>`).join('');
+    if (d.dates && d.dates.length > 0) renderDaily();
+  });
+}
+
+// ====== 采购清单 ======
+function renderProcure() {
+  const headers = _auth ? { 'Authorization': 'Basic ' + _auth } : {};
+  const select = document.getElementById('procureDate');
+  const selectedDate = select.value;
+  
+  // 加载日期列表
+  if (select.options.length === 0) {
+    fetch(BASE + '/api/orders', { headers })
+    .then(r => r.json())
+    .then(d => {
+      const dates = d.dates || [];
+      // 加上明日
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      const tomorrowStr = [tomorrow.getFullYear(), String(tomorrow.getMonth()+1).padStart(2,'0'), String(tomorrow.getDate()).padStart(2,'0')].join('/');
+      const allDates = [tomorrowStr, ...dates];
+      allDates.sort((a,b) => b.localeCompare(a));
+      select.innerHTML = allDates.map(dt => {
+        const label = dt === tomorrowStr ? dt + ' 📌明日' : dt;
+        return '<option value="' + dt + '">' + label + '</option>';
+      }).join('');
+      select.value = tomorrowStr;
+      renderProcure();
+    });
+    return;
+  }
+  
+  if (!selectedDate) return;
+  
+  fetch(BASE + '/api/orders?targetDate=' + encodeURIComponent(selectedDate), { headers })
+  .then(r => r.json())
+  .then(d => {
+    const orders = d.orders || [];
+    
+    document.getElementById('pItems').textContent = orders.length;
+    const totalWeight = orders.reduce((s, o) => s + o.weight, 0);
+    document.getElementById('pWeight').textContent = totalWeight.toFixed(1);
+    
+    const tbody = document.getElementById('pList');
+    tbody.innerHTML = orders.map(o => {
+      return '<tr><td>' + o.food + '</td><td>' + o.weight + (o.unit || '斤') + '</td></tr>';
+    }).join('');
+  });
+}
+
+function exportProcure() {
+  const select = document.getElementById('procureDate');
+  const date = select.value;
+  if (!date) return alert('请先选择日期');
+  const headers = _auth ? { 'Authorization': 'Basic ' + _auth } : {};
+  
+  fetch(BASE + '/api/orders?targetDate=' + encodeURIComponent(date), { headers })
+  .then(r => r.json())
+  .then(d => {
+    const orders = d.orders || [];
+    if (orders.length === 0) return alert('暂无采购清单');
+    let csv = '\uFEFF菜品,需求斤数\n';
+    orders.forEach(o => { csv += o.food + ',' + o.weight + '\n'; });
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = '呱呱超市采购清单_' + date.replace(/\//g,'') + '.csv';
+    link.click();
+  });
+}
+
+function clearDailyOrders() {
+  const select = document.getElementById('procureDate');
+  const date = select.value;
+  if (!date || date !== select.options[0]?.value) return alert('只能清空今日/明日报菜');
+  if (!confirm('确定清空 ' + date + ' 的所有报菜？')) return;
+  const headers = _auth ? { 'Authorization': 'Basic ' + _auth } : {};
+  fetch(BASE + '/api/orders?targetDate=' + encodeURIComponent(date), { method: 'DELETE', headers })
+  .then(r => r.json())
+  .then(d => {
+    alert('已清空');
+    renderProcure();
+  });
+}
+
+// ====== 商家管理 ======
+function loadShops() {
+  const headers = _auth ? { 'Authorization': 'Basic ' + _auth } : {};
+  Promise.all([
+    fetch(BASE + '/api/shops', { headers }).then(r => r.json()),
+    fetch(BASE + '/api/records', { headers }).then(r => r.json())
+  ])
+  .then(([shopsData, recordsData]) => {
+    const shops = shopsData.shops || [];
+    const allRecs = recordsData.records || [];
+    const list = document.getElementById('shopList');
+    
+    // 按累计金额排序，从高到低
+    const shopStats = shops.map(sName => {
+      const recs = allRecs.filter(r => r.shop === sName);
+      const total = recs.reduce((s, r) => s + r.money, 0);
+      const count = recs.length;
+      const lastDate = recs.length > 0 ? recs[recs.length-1].date : '';
+      return { name: sName, total, count, lastDate };
+    }).sort((a, b) => b.total - a.total);
+    
+    let html = '';
+    shopStats.forEach(s => {
+      html += '<div style="display:flex;align-items:center;padding:10px 0;border-bottom:1px solid #f0f0f0">' +
+        '<div style="flex:1;cursor:pointer" onclick="showShopDetail(\'' + s.name.replace(/'/g,"\\'") + '\')">' +
+          '<div><strong>' + s.name + '</strong></div>' +
+          '<div style="font-size:12px;color:#999;margin-top:2px">' +
+            (s.count > 0 
+              ? '累计 ' + s.count + ' 笔 · 共 ' + s.total.toFixed(1) + ' 元 · 最近 ' + s.lastDate 
+              : '暂无记录') +
+          '</div>' +
+        '</div>' +
+        '<div style="font-weight:bold;color:#ff6b35;font-size:16px">' + s.total.toFixed(1) + ' 元</div>' +
+        '<span class="del" onclick="delShop(\'' + s.name.replace(/'/g,"\\'") + '\')" style="margin-left:8px">✕</span>' +
+      '</div>';
+    });
+    list.innerHTML = html || '<div class="empty">暂无商家</div>';
+  });
+}
+
+function addShop() {
+  const name = document.getElementById('newShop').value.trim();
+  if (!name) return alert('请输入商家名称');
+  const headers = _auth ? { 'Authorization': 'Basic ' + _auth } : {};
+  fetch(BASE + '/api/shops', { method: 'POST', headers: { 'Content-Type': 'application/json', ...headers }, body: JSON.stringify({ name }) })
+  .then(r => r.json())
+  .then(d => {
+    if (d.error) return alert(d.error);
+    document.getElementById('newShop').value = '';
+    loadShops();
+  });
+}
+
+function delShop(name) {
+  if (!confirm('确定删除商家「' + name + '」？')) return;
+  const headers = _auth ? { 'Authorization': 'Basic ' + _auth } : {};
+  fetch(BASE + '/api/shops/' + encodeURIComponent(name), { method: 'DELETE', headers })
+  .then(r => r.json())
+  .then(d => {
+    if (d.error) return alert(d.error);
+    loadShops();
+  });
+}
+
+// ====== 商家详情弹窗 ======
+function showShopDetail(name) {
+  const headers = _auth ? { 'Authorization': 'Basic ' + _auth } : {};
+  fetch(BASE + '/api/shops/' + encodeURIComponent(name), { headers })
+  .then(r => r.json())
+  .then(d => {
+    if (d.error) return alert(d.error);
+    const shop = d.shop;
+    const certs = shop.certificates || [];
+    const certHtml = certs.length > 0
+      ? certs.map(c => '<div style="display:inline-block;margin:5px;position:relative;vertical-align:top">' +
+          '<img src="' + BASE + '/' + c.path + '" style="max-width:100px;max-height:100px;border-radius:6px;display:block;cursor:pointer" onclick="previewCert(\'' + (BASE + '/' + c.path).replace(/'/g,"\\'") + '\')">' +
+          '<span onclick="removeCert(\'' + shop.name.replace(/'/g,"\\'") + '\',\'' + c.path.replace(/'/g,"\\'") + '\');event.stopPropagation()" ' +
+          'style="position:absolute;top:-6px;right:-6px;background:#ff4444;color:#fff;border-radius:50%;width:20px;height:20px;text-align:center;line-height:20px;font-size:12px;cursor:pointer">✕</span>' +
+        '</div>').join('')
+      : '<div style="color:#999">暂无合格证</div>';
+    
+    const overlay = document.createElement('div');
+    overlay.id = 'shopDetailOverlay_' + Date.now();
+    overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.4);z-index:999;display:flex;align-items:center;justify-content:center';
+    overlay.onclick = function(e) { if (e.target === overlay) overlay.remove(); };
+    
+    overlay.innerHTML = '<div style="background:#fff;border-radius:12px;padding:24px;max-width:600px;width:90%;max-height:90vh;overflow-y:auto;box-shadow:0 8px 30px rgba(0,0,0,0.15)">' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">' +
+        '<h2 style="margin:0">🏪 ' + shop.name + '</h2>' +
+        '<span onclick="this.closest(\'[id^=shopDetailOverlay]\').remove()" style="font-size:24px;cursor:pointer;color:#999">&times;</span>' +
+      '</div>' +
+      // 电话
+      '<div style="margin-bottom:12px">' +
+        '<label style="display:block;font-weight:bold;margin-bottom:4px;font-size:13px">📞 电话</label>' +
+        '<input id="shopPhone" value="' + (shop.phone || '') + '" style="width:100%;padding:8px 10px;border:1px solid #ddd;border-radius:6px;font-size:14px">' +
+      '</div>' +
+      // 地址
+      '<div style="margin-bottom:16px">' +
+        '<label style="display:block;font-weight:bold;margin-bottom:4px;font-size:13px">📍 地址</label>' +
+        '<input id="shopAddress" value="' + (shop.address || '') + '" style="width:100%;padding:8px 10px;border:1px solid #ddd;border-radius:6px;font-size:14px">' +
+      '</div>' +
+      // 合格证
+      '<div style="margin-bottom:12px">' +
+        '<label style="display:block;font-weight:bold;margin-bottom:8px;font-size:13px">📄 合格证 <span style="color:#999;font-weight:normal;font-size:12px">（选择文件后自动上传，保存时一起提交）</span></label>' +
+        '<div id="certList" style="margin-bottom:8px">' + certHtml + '</div>' +
+        '<input type="file" id="certFileInput" accept="image/*" style="width:100%;padding:6px 0">' +
+      '</div>' +
+      // 保存按钮
+      '<div style="text-align:right;margin-top:16px;border-top:1px solid #eee;padding-top:16px">' +
+        '<button onclick="saveShopDetail(\'' + shop.name.replace(/'/g,"\\'") + '\', this)" style="padding:10px 24px;background:#ff6b35;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:14px">💾 保存</button>' +
+        '<button onclick="this.closest(\'[id^=shopDetailOverlay]\').remove()" style="margin-left:8px;padding:10px 24px;background:#999;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:14px">取消</button>' +
+      '</div>' +
+    '</div>';
+    
+    document.body.appendChild(overlay);
+  });
+}
+
+function saveShopDetail(name, btn) {
+  btn.disabled = true;
+  btn.textContent = '⏳ 保存中...';
+  
+  const phone = document.getElementById('shopPhone').value.trim();
+  const address = document.getElementById('shopAddress').value.trim();
+  const fileInput = document.getElementById('certFileInput');
+  const file = fileInput.files[0];
+  const headers = _auth ? { 'Authorization': 'Basic ' + _auth } : {};
+  
+  // 必填验证
+  if (!phone) { btn.disabled = false; btn.innerHTML = '💾 保存'; return alert('请输入电话'); }
+  if (!address) { btn.disabled = false; btn.innerHTML = '💾 保存'; return alert('请输入地址'); }
+  
+  // 先保存电话/地址，再处理图片
+  doSave(phone, address, file, name, headers, function() {
+    btn.disabled = false;
+    btn.innerHTML = '💾 保存';
+  });
+}
+
+function doSave(phone, address, file, name, headers, resetBtn) {
+  // 先保存电话/地址
+  fetch(BASE + '/api/shops/' + encodeURIComponent(name), {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...headers },
+    body: JSON.stringify({ phone, address })
+  })
+  .then(r => r.json())
+  .then(d => {
+    if (d.error) { resetBtn(); return alert(d.error); }
+    // 电话地址保存成功，再上传合格证（如果有）
+    if (file) {
+      return compressImage(file).then(blob => {
+        const formData = new FormData();
+        formData.append('file', blob, file.name);
+        return fetch(BASE + '/api/upload?shop=' + encodeURIComponent(name), {
+          method: 'POST',
+          headers: headers,
+          body: formData
+        }).then(r => r.json());
+      });
+    }
+    return Promise.resolve(null);
+  })
+  .then(uploadResult => {
+    if (!uploadResult || !uploadResult.files || uploadResult.files.length === 0) {
+      resetBtn();
+      closeAndRefresh();
+      return;
+    }
+    const filePath = uploadResult.files[0].path;
+    // 把合格证路径关联到商家
+    return fetch(BASE + '/api/shops/' + encodeURIComponent(name) + '/certificates', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...headers },
+      body: JSON.stringify({ filePath })
+    }).then(r => r.json());
+  })
+  .then(certResult => {
+    resetBtn();
+    closeAndRefresh();
+  })
+  .catch(e => { resetBtn(); alert('操作失败: ' + e.message); });
+}
+
+// 图片压缩：限制最长边 1200px，质量 0.7，最终不超过 500KB
+function compressImage(file) {
+  return new Promise((resolve, reject) => {
+    // 如果不是图片或者小于 500KB，不压缩
+    if (!file.type.startsWith('image/') || file.size < 500 * 1024) {
+      return resolve(file);
+    }
+    
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = function() {
+      URL.revokeObjectURL(url);
+      
+      let w = img.width, h = img.height;
+      const maxSize = 1200;
+      if (w > maxSize || h > maxSize) {
+        if (w > h) { h = h * maxSize / w; w = maxSize; }
+        else { w = w * maxSize / h; h = maxSize; }
+      }
+      
+      const canvas = document.createElement('canvas');
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, w, h);
+      
+      canvas.toBlob(function(blob) {
+        if (blob) resolve(blob);
+        else resolve(file); // 降级用原文件
+      }, 'image/jpeg', 0.7);
+    };
+    img.onerror = function() { resolve(file); };
+    img.src = url;
+  });
+}
+
+function closeAndRefresh() {
+  const overlay = document.querySelector('[id^=shopDetailOverlay]');
+  if (overlay) overlay.remove();
+  loadShops();
+}
+
+// ====== 合格证大图预览 ======
+function previewCert(src) {
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:1000;display:flex;align-items:center;justify-content:center;cursor:pointer';
+  overlay.onclick = function(e) { if (e.target === overlay) overlay.remove(); };
+  
+  const img = document.createElement('img');
+  img.src = src;
+  img.style.cssText = 'max-width:90vw;max-height:90vh;border-radius:8px;box-shadow:0 8px 30px rgba(0,0,0,0.3);cursor:pointer';
+  img.onclick = function() { overlay.remove(); };
+  
+  overlay.appendChild(img);
+  document.body.appendChild(overlay);
+}
+
+function uploadCert(shopName) {
+  const fileInput = document.getElementById('certFileInput');
+  const file = fileInput.files[0];
+  if (!file) return alert('请选择图片');
+  
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('shopName', shopName);
+  
+  const headers = _auth ? { 'Authorization': 'Basic ' + _auth } : {};
+  
+  fetch(BASE + '/api/upload?shop=' + encodeURIComponent(shopName), {
+    method: 'POST',
+    headers: headers,
+    body: formData
+  })
+  .then(r => r.json())
+  .then(d => {
+    if (d.error) return alert(d.error);
+    if (!d.files || d.files.length === 0) return alert('上传失败');
+    const filePath = d.files[0].path;
+    
+    // 保存到商家合格证列表
+    return fetch(BASE + '/api/shops/' + encodeURIComponent(shopName) + '/certificates', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...headers },
+      body: JSON.stringify({ filePath })
+    });
+  })
+  .then(r2 => r2.json())
+  .then(d2 => {
+    if (d2.error) return alert(d2.error);
+    // 刷新弹窗
+    showShopDetail(shopName);
+  })
+  .catch(e => alert('上传失败: ' + e.message));
+}
+
+function removeCert(shopName, certPath) {
+  if (!confirm('确定删除此合格证？')) return;
+  const headers = _auth ? { 'Authorization': 'Basic ' + _auth } : {};
+  fetch(BASE + '/api/shops/' + encodeURIComponent(shopName) + '/certificates', {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json', ...headers },
+    body: JSON.stringify({ filePath: certPath })
+  })
+  .then(r => r.json())
+  .then(d => {
+    if (d.error) return alert(d.error);
+    showShopDetail(shopName);
+  });
+}
+
+// ====== 月度统计 ======
+function getMonthKey(dateStr) {
+  const parts = dateStr.split('/');
+  return parts[0] + '-' + parts[1];
+}
+
+function initMonthSelect() {
+  fetch(BASE + '/api/dates', { headers: _auth ? { 'Authorization': 'Basic ' + _auth } : {} })
+  .then(r => r.json())
+  .then(data => {
+    const months = [...new Set((data.dates || []).map(d => getMonthKey(d)))].sort();
+    months.reverse();
+    const select = document.getElementById('monthSelect');
+    select.innerHTML = months.map(m => `<option value="${m}">${m}</option>`).join('');
+    if (months.length > 0) renderMonthly();
+  });
+}
+
+function renderMonthly() {
+  const selected = document.getElementById('monthSelect').value;
+  const typeFilter = document.getElementById('monthType').value;
+  if (!selected) return;
+
+  const headers = _auth ? { 'Authorization': 'Basic ' + _auth } : {};
+  
+  fetch(BASE + '/api/records', { headers })
+  .then(r => r.json())
+  .then(data => {
+    let records = (data.records || []).filter(r => getMonthKey(r.date) === selected);
+    if (typeFilter) records = records.filter(r => r.type === typeFilter);
+    
+    const totalWeight = records.reduce((s, r) => s + parseFloat(r.weight), 0);
+    const totalMoney = records.reduce((s, r) => s + r.money, 0);
+    const avgPrice = totalWeight > 0 ? (totalMoney / totalWeight) : 0;
+    
+    document.getElementById('mTotalWeight').textContent = totalWeight.toFixed(1);
+    document.getElementById('mTotalMoney').textContent = totalMoney.toFixed(1);
+    document.getElementById('mAvgPrice').textContent = avgPrice.toFixed(2);
+    document.getElementById('mCount').textContent = records.length;
+    
+    // 各菜品
+    const byFood = {};
+    records.forEach(r => {
+      if (!byFood[r.food]) byFood[r.food] = { weight: 0, money: 0, count: 0 };
+      byFood[r.food].weight += parseFloat(r.weight);
+      byFood[r.food].money += r.money;
+      byFood[r.food].count++;
+    });
+    const foodKeys = Object.keys(byFood).sort((a,b) => byFood[b].money - byFood[a].money);
+    document.getElementById('mFoodDetail').innerHTML = foodKeys.length === 0
+      ? '<tr><td colspan="5" class="empty">暂无数据</td></tr>'
+      : foodKeys.map(f => {
+        const d = byFood[f];
+        return `<tr><td>${f}</td><td>${d.weight.toFixed(1)}</td><td>${d.money.toFixed(1)}</td><td>${(d.money/d.weight).toFixed(2)}</td><td>${d.count}</td></tr>`;
+      }).join('');
+    
+    // 各商家
+    const byShop = {};
+    records.forEach(r => {
+      if (!byShop[r.shop]) byShop[r.shop] = { weight: 0, money: 0 };
+      byShop[r.shop].weight += parseFloat(r.weight);
+      byShop[r.shop].money += r.money;
+    });
+    const shopKeys = Object.keys(byShop).sort((a,b) => byShop[b].money - byShop[a].money);
+    document.getElementById('mShopDetail').innerHTML = shopKeys.length === 0
+      ? '<tr><td colspan="4" class="empty">暂无数据</td></tr>'
+      : shopKeys.map(s => `<tr><td>${s}</td><td>${byShop[s].weight.toFixed(1)}</td><td>${byShop[s].money.toFixed(1)}</td><td>${(byShop[s].money/byShop[s].weight).toFixed(2)}</td></tr>`).join('');
+    
+    // 全局未匹配进价的后厨记录（不限日期）
+    loadUnmatchedPrices();
+  });
+}
+
+function loadUnmatchedPrices() {
+  const headers = _auth ? { 'Authorization': 'Basic ' + _auth } : {};
+  fetch(BASE + '/api/records', { headers })
+  .then(r => r.json())
+  .then(data => {
+    let noPrice = (data.records || []).filter(r => r.type === '后厨' && r.price == 0);
+    const container = document.getElementById('unmatchedPrices');
+    if (noPrice.length === 0) {
+      container.innerHTML = '<div style="color:#999;font-size:12px;padding:4px 0">✅ 暂无未匹配进价的后厨记录</div>';
+    } else {
+      // 按日期分组
+      const byDate = {};
+      noPrice.forEach(r => { if (!byDate[r.date]) byDate[r.date] = []; byDate[r.date].push(r); });
+      let html = '<div style="border-top:1px solid #eee;padding:8px 0;margin-top:8px">';
+      html += '<div style="font-size:13px;font-weight:600;color:#e74c3c;margin-bottom:6px">⚠️ 待匹配进价的后厨记录（共' + noPrice.length + '条）</div>';
+      Object.keys(byDate).sort().forEach(date => {
+        html += '<div style="font-size:12px;color:#666;margin:4px 0">📅 ' + date + '</div>';
+        byDate[date].forEach(r => {
+          html += '<div style="display:flex;align-items:center;gap:6px;margin:4px 0;padding-left:8px">🍳 <strong>' + r.food + '</strong> ' + r.weight + (r.unit || '斤') +
+            ' 进价: <input id="gkp_' + r.id + '" type="number" step="0.01" style="width:70px;padding:4px;border:1px solid #ddd;border-radius:4px;font-size:13px" placeholder="0"> 元/' + (r.unit || '斤') +
+            ' <button onclick="setGlobalKitchenPrice(\'' + r.id + '\',\'' + r.food + '\',\'' + r.weight + '\',\'' + (r.unit || '斤') + '\')" style="padding:4px 8px;border:none;border-radius:4px;background:#28a745;color:white;font-size:12px;cursor:pointer">确认</button></div>';
+        });
+      });
+      html += '</div>';
+      container.innerHTML = html;
+    }
+  });
+}
+
+function setGlobalKitchenPrice(id, food, weight, unit) {
+  const input = document.getElementById('gkp_' + id);
+  const price = parseFloat(input.value);
+  if (isNaN(price) || price <= 0) return alert('请输入有效的价格');
+  const money = Math.round(weight * price * 100) / 100;
+  const headers = _auth ? { 'Authorization': 'Basic ' + _auth } : {};
+  fetch(BASE + '/api/records/' + id, {
+    method: 'PUT',
+    headers: Object.assign({ 'Content-Type': 'application/json' }, headers),
+    body: JSON.stringify({ price: price, money: money })
+  })
+  .then(r => { if (!r.ok) throw new Error('更新失败'); return r.json(); })
+  .then(function() {
+    renderMonthly();
+  })
+  .catch(function(e) { alert('设置失败：' + e.message); });
+}
+
+function matchPrices() {
+  if (!confirm('自动匹配：用最新自采进价更新所有未定价的后厨记录？')) return;
+  fetch(BASE + '/api/records/match-prices', {
+    method: 'PUT',
+    headers: { 'Authorization': 'Basic ' + _auth }
+  })
+  .then(r => r.json())
+  .then(d => {
+    if (d.success) {
+      alert(`✅ 已匹配 ${d.matched} 条后厨记录`);
+      renderMonthly();
+    }
+  });
+}
+
+function exportMonthly() {
+  const selected = document.getElementById('monthSelect').value;
+  const typeFilter = document.getElementById('monthType').value;
+  if (!selected) return alert('请选择月份');
+  
+  const headers = _auth ? { 'Authorization': 'Basic ' + _auth } : {};
+  fetch(BASE + '/api/records', { headers })
+  .then(r => r.json())
+  .then(data => {
+    let records = (data.records || []).filter(r => getMonthKey(r.date) === selected);
+    if (typeFilter) records = records.filter(r => r.type === typeFilter);
+    if (records.length === 0) return alert('暂无数据');
+    
+    let csv = '\uFEFF日期,时间,商家,菜品,斤数,进价,总金额,用途\n';
+    records.forEach(r => {
+      csv += `${r.date},${r.time||''},${r.shop},${r.food},${r.weight},${r.price},${r.money},${r.type||'自采'}\n`;
+    });
+    
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `呱呱超市月度报表_${selected}.csv`;
+    link.click();
+  });
+}
+
+// ====== 库存管理 ======
+let stockFoods = {};
+
+function initStockTab() {
+  const today = new Date();
+  const y = today.getFullYear();
+  const m = String(today.getMonth() + 1).padStart(2, '0');
+  const d = String(today.getDate()).padStart(2, '0');
+  document.getElementById('stockDate').value = y + '-' + m + '-' + d;
+  loadStockOverview();
+}
+
+function loadStockOverview() {
+  const dateInput = document.getElementById('stockDate').value;
+  if (!dateInput) return;
+  const [y, m, d] = dateInput.split('-');
+  const date = y + '/' + parseInt(m) + '/' + parseInt(d);
+  
+  fetch(BASE + '/api/stock/overview?date=' + encodeURIComponent(date), {
+    headers: { 'Authorization': 'Basic ' + _auth }
+  })
+  .then(r => r.json())
+  .then(data => {
+    const container = document.getElementById('stockOverview');
+    const items = data.items || [];
+    if (items.length === 0) {
+      container.innerHTML = '<div class="empty">暂无数据，请先导入销售数据或录入进货</div>';
+      return;
+    }
+    let html = '<table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr style="background:#f0f0f0">' +
+      '<th style="padding:6px;text-align:left">菜品</th>' +
+      '<th style="padding:6px;text-align:right">期初</th>' +
+      '<th style="padding:6px;text-align:right">进货</th>' +
+      '<th style="padding:6px;text-align:right">后厨</th>' +
+      '<th style="padding:6px;text-align:right">销售</th>' +
+      '<th style="padding:6px;text-align:right">剩余</th></tr></thead><tbody>';
+    items.forEach(item => {
+      const remainingColor = item.remaining < 0 ? 'color:red' : (item.remaining == 0 ? 'color:#999' : 'color:green');
+      html += '<tr>' +
+        '<td style="padding:4px 6px;border-bottom:1px solid #eee">' + item.food + '</td>' +
+        '<td style="padding:4px 6px;border-bottom:1px solid #eee;text-align:right">' + item.initStock + '</td>' +
+        '<td style="padding:4px 6px;border-bottom:1px solid #eee;text-align:right">' + item.purchase + '</td>' +
+        '<td style="padding:4px 6px;border-bottom:1px solid #eee;text-align:right">' + item.kitchen + '</td>' +
+        '<td style="padding:4px 6px;border-bottom:1px solid #eee;text-align:right">' + item.sale + '' +
+          (item.saleAmount > 0 ? '<br><span style="font-size:11px;color:#666">¥' + item.saleAmount + '</span>' : '') + '</td>' +
+        '<td style="padding:4px 6px;border-bottom:1px solid #eee;text-align:right;' + remainingColor + ';font-weight:bold">' + item.remaining + '</td>' +
+        '</tr>';
+    });
+    html += '</tbody></table>';
+    html += '<div style="margin-top:8px;font-size:12px;color:#999">共 ' + items.length + ' 个品类</div>';
+    container.innerHTML = html;
+  });
+}
+
+function importSalesFile() {
+  const fileInput = document.getElementById('csvFile');
+  const file = fileInput.files[0];
+  if (!file) return alert('请选择芯友导出的CSV文件');
+  
+  // 从文件名提取日期，如 商品利润表_15054971881-2026-05-15 00_00_00~2026-05-15 23_59_59.csv
+  const nameMatch = file.name.match(/(\d{4})-(\d{2})-(\d{2})/);
+  if (!nameMatch) return alert('无法从文件名识别日期，文件名需包含 YYYY-MM-DD 格式');
+  const date = nameMatch[1] + '/' + parseInt(nameMatch[2]) + '/' + parseInt(nameMatch[3]);
+  
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const csvText = e.target.result;
+    if (!csvText.trim()) return alert('文件内容为空');
+    
+    const lines = csvText.split('\n').filter(l => l.trim());
+    if (lines.length < 2) return alert('CSV内容为空或格式不对');
+    
+    const rows = [];
+    for (let i = 1; i < lines.length; i++) {
+      const cols = parseCSVLine(lines[i]);
+      if (cols.length < 6) continue;
+      const food = cols[0].trim();
+      const shop = cols[1] || '呱呱精品生鲜连锁店3店';
+      const weight = parseFloat(cols[5]) || 0;
+      const unit = cols[6] || 'kg';
+      const price = parseFloat(cols[4]) || 0;
+      const cost = parseFloat(cols[8]) || 0;
+      const amount = parseFloat(cols[9]) || 0;
+      const profit = parseFloat(cols[13]) || 0;
+      if (food && food !== '总计' && weight > 0) {
+        rows.push({ food, shop, weight, unit, price, cost, amount, profit });
+      }
+    }
+    
+    if (rows.length === 0) return alert('未能解析出有效数据，请检查CSV格式');
+    
+    fetch(BASE + '/api/stock/import', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Basic ' + _auth },
+      body: JSON.stringify({ date, rows })
+    })
+    .then(r => r.json())
+    .then(data => {
+      document.getElementById('importResult').innerHTML = '✅ 成功导入 ' + data.count + ' 条销售记录（' + date + '），已覆盖旧数据';
+      fileInput.value = '';
+      loadStockOverview();
+    })
+    .catch(e => alert('导入失败：' + e.message));
+  };
+  reader.readAsText(file);
+}
+
+// CSV 行解析（处理引号包裹的字段）
+function parseCSVLine(line) {
+  const result = [];
+  let current = '';
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (ch === '"') {
+      inQuotes = !inQuotes;
+    } else if (ch === ',' && !inQuotes) {
+      result.push(current.trim());
+      current = '';
+    } else {
+      current += ch;
+    }
+  }
+  result.push(current.trim());
+  return result;
+}
+
+// ====== 系统管理 ======
+function backupDB() {
+  const btn = document.querySelector('#tab-system .btn');
+  btn.textContent = '⏳ 备份中...';
+  btn.disabled = true;
+  fetch(BASE + '/api/backup', {
+    method: 'POST',
+    headers: { 'Authorization': 'Basic ' + _auth }
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.success) {
+      document.getElementById('backupResult').innerHTML = '✅ 备份成功：' + data.date + '（<a href="/data/backup-' + data.date + '.db" style="color:#3b82f6" download>⬇️ 下载备份</a>）';
+    } else {
+      document.getElementById('backupResult').innerHTML = '❌ 备份失败：' + (data.error || '未知错误');
+    }
+  })
+  .catch(e => document.getElementById('backupResult').innerHTML = '❌ 备份失败：' + e.message)
+  .finally(() => { btn.textContent = '💾 备份数据库'; btn.disabled = false; });
+}
+
+function showStats() {
+  const el = document.getElementById('statsResult');
+  el.innerHTML = '⏳ 加载中...';
+  fetch(BASE + '/api/stats', {
+    headers: { 'Authorization': 'Basic ' + _auth }
+  })
+  .then(r => r.json())
+  .then(stats => {
+    let html = '<table style="width:100%;font-size:13px"><thead><tr><th>数据表</th><th>记录数</th></tr></thead><tbody>';
+    for (const [table, count] of Object.entries(stats)) {
+      const icons = { shops:'🏪', records:'📝', orders:'📋', deposits:'💰', sales:'📊', stock:'📦', stock_cold:'❄️', stock_shelf:'🗄️', stock_orders:'📋' };
+      html += '<tr><td>' + (icons[table] || '📁') + ' ' + table + '</td><td style="text-align:center;font-weight:bold">' + count + '</td></tr>';
+    }
+    html += '</tbody></table>';
+    html += '<div style="margin-top:8px"><button class="btn" onclick="backupDB()">💾 立即备份</button></div>';
+    el.innerHTML = html;
+  })
+  .catch(e => el.innerHTML = '❌ 加载失败：' + e.message);
+}
+
+// 自动登录（如果 URL 带 auth 信息）
+initMonthSelect();
+initDailyDate();
+</script>
+</body>
+</html>

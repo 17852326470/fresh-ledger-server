@@ -1,0 +1,873 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+ <meta charset="UTF-8">
+ <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+ <title>呱呱超市 · 每日进货台账</title>
+<link rel="icon" href="/favicon.png" sizes="32x32">
+<link rel="apple-touch-icon" href="/favicon.png">
+ <style>
+ * { box-sizing: border-box; margin: 0; padding: 0; }
+ body {
+ .role-switch {
+  display: flex; gap: 0; margin: 8px 0 12px; border-radius: 8px; overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+ }
+ .role-btn {
+  flex: 1; text-align: center; padding: 10px 0; font-size: 15px; cursor: pointer;
+  background: #fff; border: none; color: #999; font-weight: 500;
+  transition: all 0.2s;
+ }
+ .role-btn.active-a { background: #ff6b35; color: #fff; font-weight: 600; }
+ .role-btn.active-b { background: #3b82f6; color: #fff; font-weight: 600; }
+  font-family: -apple-system, BlinkMacSystemFont, "微软雅黑", sans-serif;
+  max-width: 450px;
+  margin: 0 auto;
+  background: #f5f5f5;
+  padding: 10px 10px 80px;
+  font-size: 15px;
+ }
+ .title { text-align: center; font-size: 22px; color: #ff6b35; font-weight: bold; margin: 8px 0 12px; }
+ .card { background: white; border-radius: 10px; padding: 12px 14px; margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+ h3 { font-size: 16px; font-weight: 600; color: #333; margin-bottom: 8px; border-left: 4px solid #ff6b35; padding-left: 8px; }
+ label { font-size: 13px; color: #666; display: block; margin-top: 6px; }
+ input, select {
+  width: 100%; padding: 10px; margin: 4px 0 8px; border: 1px solid #ddd; border-radius: 6px;
+  font-size: 15px; background: #fafafa;
+ }
+ input:focus, select:focus { outline: none; border-color: #ff6b35; background: #fff; }
+ .row { display: flex; gap: 8px; }
+ .row > * { flex: 1; }
+ .btn {
+  background: #ff6b35; color: white; border: none; border-radius: 6px;
+  padding: 10px 16px; font-size: 15px; font-weight: 600; cursor: pointer; width: 100%; margin: 4px 0;
+ }
+ .btn:active { opacity: 0.8; }
+ .btn-green { background: #28a745; }
+ .btn-danger { background: #dc3545; }
+ .btn-sm { padding: 6px 10px; font-size: 13px; width: auto; display: inline-block; }
+ .item { padding: 10px 0; border-bottom: 1px solid #f0f0f0; line-height: 1.7; font-size: 14px; }
+ .item:last-child { border-bottom: none; }
+ .item .meta { font-size: 12px; color: #999; }
+ .unpay { color: #dc3545; font-weight: bold; cursor: pointer; }
+ .pay { color: #28a745; font-weight: bold; cursor: pointer; }
+ .total-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; font-size: 16px; font-weight: bold; color: #ff6b35; }
+ .debt-card { background: #fff5f5; border: 1px solid #ffcccc; }
+ .debt-item { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #ffe0e0; font-size: 14px; }
+ .debt-item:last-child { border-bottom: none; }
+ .debt-item .name { font-weight: 600; }
+ .debt-item .amount { color: #dc3545; font-weight: bold; }
+ .tab-bar {
+  position: fixed; bottom: 0; left: 0; right: 0; max-width: 450px; margin: 0 auto;
+  background: white; display: flex; border-top: 1px solid #ddd; box-shadow: 0 -2px 6px rgba(0,0,0,0.05);
+ }
+ .tab-bar .tab {
+  flex: 1; text-align: center; padding: 10px 0; font-size: 13px; color: #999; cursor: pointer;
+  border-bottom: 3px solid transparent;
+ }
+ .tab-bar .tab.active { color: #ff6b35; border-bottom-color: #ff6b35; font-weight: 600; }
+ .page { display: none; }
+ .page.active { display: block; }
+ .empty { text-align: center; color: #bbb; padding: 20px 0; font-size: 14px; }
+ .mt-8 { margin-top: 8px; }
+ .admin-link { text-align: center; margin: 8px 0; font-size: 11px; color: #ccc; }
+ .admin-link a { color: #ccc; text-decoration: none; }
+ .admin-link a:hover { color: #999; }
+  .footer { text-align: center; font-size: 11px; color: #ddd; margin-top: 4px; }
+ </style>
+</head>
+<body>
+
+<div class="title"><img src="/favicon.png" style="width:20px;height:20px;vertical-align:middle;border-radius:50%"> 呱呱超市 · 每日进货台账</div>
+
+<div class="tab-bar">
+ <div class="tab active" onclick="switchTab('record')">📝 记账</div>
+ <div class="tab" onclick="switchTab('today')">📋 今日</div>
+ <div class="tab" onclick="switchTab('debt')">💰 欠款</div>
+ <div class="tab" onclick="switchTab('procure')">📋 后厨采购清单</div>
+</div>
+
+<!-- 页面1：记账 -->
+<div id="page-record" class="page active">
+<div class="role-switch" style="margin:-4px 0 10px 0">
+ <button class="role-btn active-a" id="roleBtnA" onclick="switchRole('A')">🧑‍🌾 采购A<br><small style="font-weight:normal;font-size:11px">下市场买菜</small></button>
+ <button class="role-btn" id="roleBtnB" onclick="switchRole('B')">🚛 采购B<br><small style="font-weight:normal;font-size:11px">车上等候 · 退框子</small></button>
+</div>
+<div id="buyerA-content">
+ <div class="card">
+  <h3>➕ 管理商家</h3>
+  <div class="row">
+   <input type="text" id="shopName" placeholder="输入商家名称" style="flex:3">
+   <button class="btn btn-sm" onclick="addShop()" style="flex:1; margin-left:4px">保存</button>
+  </div>
+  <select id="shopSelect" onchange="document.getElementById('food').focus()">
+   <option value="">— 选择已有商家 —</option>
+  </select>
+ </div>
+ <div class="card">
+  <h3>📝 记一笔</h3>
+  <label>菜品名称</label>
+  <input type="text" id="food" placeholder="如：白菜、土豆">
+  <script>
+    // 从 URL 参数自动填充菜品名称（来自建议采购单跳转）
+    const params = new URLSearchParams(window.location.search);
+    const autoFood = params.get('autoFood');
+    if (autoFood) {
+      document.getElementById('food').value = autoFood;
+      // 自动切到记账 Tab
+      const recordTab = document.querySelector('[onclick*="record"]') || document.querySelector('[onclick*="switchTab.*record"]');
+      if (typeof switchTab === 'function') switchTab('record');
+    }
+  </script>
+  <div class="row">
+   <div style="flex:1"><label>数量</label><input type="number" id="weight" placeholder="30" step="0.5" oninput="autoCalc()"></div>
+   <div style="flex:0 0 60px"><label>单位</label>
+    <select id="unit" onchange="autoCalc()"><option>斤</option><option>盒</option><option>袋</option><option>箱</option><option>个</option><option>包</option></select>
+   </div>
+   <div style="flex:1"><label>进价（元/单位）</label><input type="number" id="price" placeholder="2.5" step="0.1" oninput="autoCalc()"></div>
+  </div>
+  <label>总金额 <span style="color:#999;font-weight:normal">（自动计算）</span></label>
+  <input type="text" id="money" placeholder="自动计算" readonly style="background:#f0f0f0;font-weight:bold;color:#ff6b35">
+  <div class="row" style="margin-top:4px">
+   <div style="flex:1"><label>用途</label>
+    <select id="type"><option value="自采">🏪 自采</option><option value="后厨">🍳 后厨</option></select>
+   </div>
+   <div style="flex:1"><label>付款</label>
+    <select id="status"><option value="未付">❌ 未付</option><option value="已付">✅ 已付</option></select>
+  </div>
+  <div style="margin-top:8px;padding-top:8px;border-top:1px solid #eee">
+   <label style="font-weight:600">📦 框子押金（选填）</label>
+   <div class="row">
+    <input id="bigBox" type="number" placeholder="30" oninput="updateDepositLabel()" style="flex:1">
+    <input id="smallBox" type="number" placeholder="20" oninput="updateDepositLabel()" style="flex:1">
+   </div>
+  </div>
+   </div>
+  </div>
+  <button class="btn" onclick="addRecord()">保存记录</button>
+  </div>
+ </div>
+</div>
+</div>
+
+<!-- 页面2：今日 -->
+<div id="page-today" class="page">
+ <div class="card">
+  <div class="total-row">
+   <span>今日已记 <span id="todayCount">0</span> 笔</span>
+   <span>合计：<span id="todayTotal">0</span> 元</span>
+  </div>
+  <div style="text-align:center;margin-top:8px">
+   <button class="btn btn-sm" onclick="printTodayList()" style="width:auto;padding:6px 20px;background:#ff6b35;color:white;border:none;border-radius:6px;font-size:13px;cursor:pointer">🖨️ 打印今日清单</button>
+  </div>
+  <div class="sync-status" id="syncStatus" style="font-size:11px;color:#999;text-align:center"></div>
+ </div>
+ <div class="card">
+  <h3>📋 今日进货清单</h3>
+  <div id="todayList"></div>
+  <div class="total-row" style="border-top:1px solid #eee;margin-top:4px">
+   <span>当日合计</span><span id="todayTotal2">0 元</span>
+  </div>
+ </div>
+</div>
+
+
+<!-- 页面5：采购清单 -->
+<div id="page-procure" class="page">
+ <div class="card">
+  <h3>📋 后厨采购清单</h3>
+  <select id="procureDate2" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;font-size:15px;margin-bottom:10px;background:white" onchange="renderProcure2()"></select>
+  <div style="display:flex;gap:8px;margin-bottom:10px">
+   <div style="flex:1;background:#f8f9fa;text-align:center;padding:8px;border-radius:8px">
+    <div style="font-size:20px;font-weight:bold;color:#ff6b35" id="pItems2">0</div>
+    <div style="font-size:12px;color:#999">菜品数</div>
+   </div>
+   <div style="flex:1;background:#f8f9fa;text-align:center;padding:8px;border-radius:8px">
+    <div style="font-size:20px;font-weight:bold;color:#ff6b35" id="pWeight2">0</div>
+    <div style="font-size:12px;color:#999">总数量</div>
+   </div>
+  </div>
+  <table style="width:100%;border-collapse:collapse;font-size:14px">
+   <thead><tr style="border-bottom:1px solid #eee"><th style="text-align:left;padding:6px 0;color:#666">菜品</th><th style="text-align:right;padding:6px 0;color:#666">数量</th></tr></thead>
+   <tbody id="pList2" style="color:#333"></tbody>
+  </table>
+  <div style="margin-top:12px"><button onclick="exportProcure2()" style="width:100%;padding:10px;border:none;border-radius:8px;background:#ff6b35;color:white;font-size:15px;cursor:pointer">📤 导出采购清单 (CSV)</button></div>
+ </div>
+</div>
+
+<!-- 页面4：欠款 -->
+<div id="page-debt" class="page">
+ <div class="card">
+  <h3 style="border-left-color:#dc3545;">💰 欠款查询</h3>
+  <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+   <input type="date" id="debtDateFrom" style="flex:1;min-width:120px;padding:8px;border:1px solid #ddd;border-radius:6px;font-size:14px" onchange="renderDebt()">
+   <span style="align-self:center;color:#999">至</span>
+   <input type="date" id="debtDateTo" style="flex:1;min-width:120px;padding:8px;border:1px solid #ddd;border-radius:6px;font-size:14px" onchange="renderDebt()">
+   <button class="btn btn-sm" style="background:#f0f0f0;color:#333;padding:8px 12px" onclick="document.getElementById('debtDateFrom').value='';document.getElementById('debtDateTo').value='';renderDebt()">全部</button>
+  </div>
+ </div>
+ <div class="card debt-card">
+  <h3 style="border-left-color:#dc3545;">💰 商家欠款汇总</h3>
+  <div id="debtSummary"></div>
+  <div class="total-row" style="border-top:1px solid #ffe0e0;margin-top:4px">
+   <span>总欠款</span><span style="color:#dc3545" id="totalDebt">0 元</span>
+  </div>
+  <button class="btn btn-green mt-8" onclick="payAllDebt()">✅ 全部已付款</button>
+ </div>
+ <div class="card">
+  <h3 style="border-left-color:#dc3545;">❌ 未付款明细</h3>
+  <div id="unpayDetailList"></div>
+ </div>
+</div>
+
+
+
+</div>
+<!-- 采购B页面 -->
+<div id="page-buyerB" style="display:none">
+
+<!-- 顶部buyerA-content内已有角色切换按钮 -->
+
+<div class="card">
+ <h3 style="border-left-color:#3b82f6;">🔄 退框子</h3>
+ <div style="background:#eff6ff;border-radius:8px;padding:10px;margin-bottom:10px;font-size:13px;line-height:1.8">
+  <strong>📋 你的工作</strong><br>把空框子退回给商家，拿回押金。
+ </div>
+ <label>商家</label>
+ <select id="returnShop" style="margin-bottom:10px" onchange="onReturnShopChange()"><option value="">请选择商家</option></select>
+ <div class="row" style="margin-bottom:10px">
+  <div style="flex:1"><label style="font-size:12px">大框退回</label><input id="returnBig" type="number" placeholder="数量" oninput="calcReturnAmount()" style="margin:2px 0 0"></div>
+  <div style="flex:1"><label style="font-size:12px">小框退回</label><input id="returnSmall" type="number" placeholder="数量" oninput="calcReturnAmount()" style="margin:2px 0 0"></div>
+ </div>
+ <label>退回押金（元）</label>
+ <input id="returnAmount" type="number" readonly style="background:#f0f0f0;font-weight:bold;color:#3b82f6;margin-bottom:10px" placeholder="自动计算">
+ <label>拍照留证<span style="color:#ff4444;font-size:12px"> *必拍</span></label>
+ <input type="file" accept="image/*" capture="environment" id="certFileInput_return" style="margin-bottom:10px" onchange="onReturnPhoto(this)">
+ <div id="returnPhotoPreview"></div>
+ <button class="btn" style="background:#3b82f6;margin-top:6px" onclick="submitReturn()">✅ 确认退框</button>
+</div>
+
+<div class="card">
+ <h3 style="border-left-color:#3b82f6;">📋 退框记录</h3>
+ <input type="date" id="returnDateInput" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;font-size:14px;margin-bottom:8px" onchange="loadReturnRecords()">
+ <div id="returnRecordsList">
+  <div class="empty">暂无记录</div>
+ </div>
+</div>
+
+</div>
+
+<div class="admin-link">
+ <a href="#" onclick="showHelp()">💡 使用帮助</a> · 
+ <a href="/admin">⚙️ 管理后台</a>
+</div>
+<div class="footer"><img src="/favicon.png" style="width:20px;height:20px;vertical-align:middle;border-radius:50%"> 呱呱超市 · 内部使用</div>
+
+<script>
+// ====== API 封装 ======
+async function apiGet(url) {
+  const r = await fetch(url);
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  return r.json();
+}
+async function apiPost(url, body) {
+  const r = await fetch(url, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
+  if (!r.ok) { const e = await r.json().catch(()=>({})); throw new Error(e.error || 'HTTP ' + r.status); }
+  return r.json();
+}
+async function apiPut(url, body) {
+  const opt = { method: 'PUT' };
+  if (body) { opt.headers = {'Content-Type':'application/json'}; opt.body = JSON.stringify(body); }
+  const r = await fetch(url, opt);
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  return r.json();
+}
+async function apiDel(url) {
+  const r = await fetch(url, { method: 'DELETE' });
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  return r.json();
+}
+
+// ====== 预设商家 ======
+const DEFAULT_SHOPS = ['毛式菜业','浩源','国良','菜小利','生国','甘蓝','言成','河北蜜薯','莲藕','鑫隆','豆芽','仁怀峰','吴彬','新润','蘑菇'];
+
+let shops = [];
+let records = [];
+let allRecords = [];
+
+async function loadAll() {
+  try {
+    const [shopsData, recordsData] = await Promise.all([
+      apiGet('/api/shops'),
+      apiGet('/api/records')
+    ]);
+    shops = shopsData.shops || [];
+    records = recordsData.records || [];
+    allRecords = records;
+    
+    // 如果商家列表为空，自动写入预设商家
+    if (shops.length === 0) {
+      for (const name of DEFAULT_SHOPS) {
+        try { await apiPost('/api/shops', { name }); } catch {}
+      }
+      shops = [...DEFAULT_SHOPS];
+    }
+    
+    renderAll();
+  } catch (e) {
+    document.getElementById('syncStatus').textContent = '⚠️ 连接服务器失败: ' + e.message;
+  }
+}
+
+function renderAll() {
+  renderShopSelect();
+  renderTodaySummary();
+  renderTodayList();
+  renderDebt();
+}
+
+// ====== 页面切换 ======
+function switchTab(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  document.querySelector(`.tab[onclick*="'${name}'"]`).classList.add('active');
+  if (name === 'today') renderTodayList();
+  if (name === 'debt') renderDebt();
+  if (name === 'procure') renderProcure2();
+
+  // 切换tab时隐藏采购B内容（在page容器外独立显示）
+  var buyerBDiv = document.getElementById('page-buyerB');
+  var buyerAContent = document.getElementById('buyerA-content');
+  if (name === 'record') {
+    buyerBDiv.style.display = currentRole === 'B' ? 'block' : 'none';
+    if (buyerAContent) buyerAContent.style.display = currentRole === 'A' ? 'block' : 'none';
+  } else {
+    buyerBDiv.style.display = 'none';
+    if (buyerAContent) buyerAContent.style.display = 'none';
+  }
+}
+
+// ====== 商家 ======
+async function addShop() {
+  let name = document.getElementById('shopName').value.trim();
+  if (!name) return alert('请输入商家名称！');
+  try {
+    await apiPost('/api/shops', { name });
+    document.getElementById('shopName').value = '';
+    await loadAll();
+    alert('✅ 商家「' + name + '」已添加');
+  } catch (e) {
+    alert('❌ ' + e.message);
+  }
+}
+
+function renderShopSelect() {
+  const select = document.getElementById('shopSelect');
+  select.innerHTML = '<option value="">— 选择已有商家 —</option>';
+  shops.forEach(s => {
+    select.innerHTML += `<option value="${s}">${s}</option>`;
+  });
+}
+
+// ====== 自动计算 ======
+function autoCalc() {
+  let w = parseFloat(document.getElementById('weight').value) || 0;
+  let p = parseFloat(document.getElementById('price').value) || 0;
+  document.getElementById('money').value = (w * p) > 0 ? (w * p).toFixed(1) : '';
+}
+
+// ====== 添加记录 ======
+async function addRecord() {
+  let shop = document.getElementById('shopSelect').value;
+  let food = document.getElementById('food').value.trim();
+  let weight = document.getElementById('weight').value.trim();
+  let unit = document.getElementById('unit').value;
+  let price = document.getElementById('price').value.trim();
+  let money = document.getElementById('money').value.trim();
+  let status = document.getElementById('status').value;
+  let type = document.getElementById('type').value;
+  let bigBox = parseInt(document.getElementById('bigBox').value) || 0;
+  let smallBox = parseInt(document.getElementById('smallBox').value) || 0;
+
+  if (!shop) return alert('请选择商家！');
+  if (!food) return alert('请输入菜品名称！');
+  if (!weight || parseFloat(weight) <= 0) return alert('请输入有效的数量！');
+  if (!price || parseFloat(price) <= 0) return alert('请输入有效的进价！');
+
+  try {
+    await apiPost('/api/records', { shop, food, weight, unit, price, money, status, type, bigBox, smallBox });
+    document.getElementById('food').value = '';
+    document.getElementById('weight').value = '';
+    document.getElementById('price').value = '';
+    document.getElementById('money').value = '';
+    document.getElementById('bigBox').value = '';
+    document.getElementById('smallBox').value = '';
+    await loadAll();
+    alert('✅ 已记录：' + shop + ' — ' + food + ' ' + weight + unit);
+  } catch (e) {
+    alert('❌ ' + e.message);
+  }
+}
+
+function getLocalDate() {
+  const d = new Date();
+  return [d.getFullYear(), String(d.getMonth()+1).padStart(2,'0'), String(d.getDate()).padStart(2,'0')].join('/');
+}
+
+// ====== 今日 ======
+function renderTodayList() {
+  let today = getLocalDate();
+  let todayRecords = records.filter(r => r.date === today);
+  let html = '';
+  let total = 0;
+  todayRecords.forEach(r => {
+    total += r.money;
+    let statusHtml = r.status === '未付'
+      ? `<span class="unpay" onclick="toggleStatus('${r.id}')">❌ 未付</span>`
+      : `<span class="pay" onclick="toggleStatus('${r.id}')">✅ 已付</span>`;
+    const isKitchenNoPrice = r.type === '后厨' && r.price == 0;
+    let priceHtml = isKitchenNoPrice
+      ? `⚠️ 待定价 <a href="#" onclick="setKitchenPrice('${r.id}','${r.food}','${r.weight}')" style="color:#28a745;font-size:12px;text-decoration:underline">点击输入进价</a>`
+      : `× ${r.price}元/${r.unit || '斤'}`;
+    const unit = r.unit || '斤';
+    html += `<div class="item">
+      <span class="meta">${r.time}</span> | <strong>${r.food}</strong> ${r.weight}${unit} ${priceHtml}<br>
+      商家：${r.shop} | 总价 ${r.money}元 ${statusHtml}
+    </div>`;
+  });
+  document.getElementById('todayList').innerHTML = html || '<div class="empty">今天还没记账 📝</div>';
+  document.getElementById('todayTotal2').textContent = total.toFixed(1) + ' 元';
+}
+
+function renderTodaySummary() {
+  if (records.length === 0) { document.getElementById('todayCount').textContent = '0'; document.getElementById('todayTotal').textContent = '0'; return; }
+  let today = getLocalDate();
+  let todayRecords = records.filter(r => r.date === today);
+  document.getElementById('todayCount').textContent = todayRecords.length;
+  document.getElementById('todayTotal').textContent = todayRecords.reduce((s, r) => s + r.money, 0).toFixed(1);
+}
+
+function setKitchenPrice(id, food, weight) {
+  const price = prompt('请输入 "' + food + '" 的进价（元/斤）：', '');
+  if (price === null || price === '') return;
+  const p = parseFloat(price);
+  if (isNaN(p) || p <= 0) return alert('请输入有效的价格');
+  const money = Math.round(weight * p * 100) / 100;
+  apiPut('/api/records/' + id, { price: p, money: money })
+    .then(function() { loadAll(); })
+    .catch(function(e) { alert('设置失败：' + e.message); });
+}
+
+// ====== 欠款 ======
+function renderDebt() {
+  let from = document.getElementById('debtDateFrom').value;
+  let to = document.getElementById('debtDateTo').value;
+  let unpayRecords = records.filter(r => r.status === '未付' && r.type === '自采');
+  if (from) unpayRecords = unpayRecords.filter(r => r.date >= from);
+  if (to) unpayRecords = unpayRecords.filter(r => r.date <= to);
+  let debtByShop = {};
+  unpayRecords.forEach(r => { debtByShop[r.shop] = (debtByShop[r.shop] || 0) + r.money; });
+  let shopNames = Object.keys(debtByShop);
+  let totalDebt = Object.values(debtByShop).reduce((a, b) => a + b, 0);
+
+  document.getElementById('debtSummary').innerHTML = shopNames.length === 0
+    ? '<div class="empty">🎉 没有欠款，全部已结清！</div>'
+    : shopNames.map(s => `<div class="debt-item"><span class="name">${s}</span><span class="amount">${debtByShop[s].toFixed(1)} 元</span> <button onclick="payShopDebt('${s}')" style="float:right;padding:4px 8px;border:1px solid #28a745;border-radius:4px;background:white;color:#28a745;font-size:12px;cursor:pointer">✅ 结清</button></div>`).join('');
+  document.getElementById('totalDebt').textContent = totalDebt.toFixed(1) + ' 元';
+
+  document.getElementById('unpayDetailList').innerHTML = unpayRecords.length === 0
+    ? '<div class="empty">暂无未付款明细</div>'
+    : unpayRecords.map(r => `<div class="item">
+      日期 ${r.date} ${r.time || ''}<br>
+      ${r.shop} — ${r.food} ${r.weight}斤 × ${r.price}元 = <strong>${r.money}元</strong>
+      <span class="unpay" onclick="toggleStatus('${r.id}')"> ❌ 未付</span>
+    </div>`).join('');
+}
+
+// ====== 操作 ======
+async function toggleStatus(id) {
+  try {
+    await apiPut('/api/records/' + id + '/toggle-status');
+    await loadAll();
+  } catch (e) { alert('❌ ' + e.message); }
+}
+
+async function payAllDebt() {
+  if (!confirm('确认将所有未付款标记为「已付」？')) return;
+  try {
+    await apiPut('/api/records/pay-all');
+    await loadAll();
+    alert('✅ 全部已标记为已付款！');
+  } catch (e) { alert('❌ ' + e.message); }
+}
+
+async function payShopDebt(shop) {
+  if (!confirm('确认将「' + shop + '」所有欠款标记为已付？')) return;
+  try {
+    await apiPut('/api/records/pay-shop', { shop: shop });
+    await loadAll();
+    alert('✅ ' + shop + ' 已结清！');
+  } catch (e) { alert('❌ ' + e.message); }
+}
+
+// ====== 采购清单 ======
+let _procureDate2 = '';
+
+function renderProcure2() {
+  const select = document.getElementById('procureDate2');
+  if (select.options.length === 0) {
+    apiGet('/api/orders').then(d => {
+      const dates = d.dates || [];
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      const tomorrowStr = [tomorrow.getFullYear(), String(tomorrow.getMonth()+1).padStart(2,'0'), String(tomorrow.getDate()).padStart(2,'0')].join('/');
+      const allDates = [tomorrowStr, ...dates];
+      allDates.sort((a,b) => b.localeCompare(a));
+      select.innerHTML = allDates.map(dt => {
+        const label = dt === tomorrowStr ? dt + ' 📌明日' : dt;
+        return '<option value="' + dt + '">' + label + '</option>';
+      }).join('');
+      select.value = tomorrowStr;
+      renderProcure2();
+    });
+    return;
+  }
+  _procureDate2 = select.value;
+  if (!_procureDate2) return;
+  
+  apiGet('/api/orders?targetDate=' + encodeURIComponent(_procureDate2)).then(d => {
+    const orders = d.orders || [];
+    document.getElementById('pItems2').textContent = orders.length;
+    const total = orders.reduce((s, o) => s + o.weight, 0);
+    document.getElementById('pWeight2').textContent = total.toFixed(1);
+    document.getElementById('pList2').innerHTML = orders.map(o => {
+      const remarkHtml = o.remark ? '<br><span style="font-size:12px;color:#888">📝 ' + o.remark + '</span>' : '';
+      return '<tr><td style="padding:4px 0">' + o.food + remarkHtml + '</td><td style="text-align:right;padding:4px 0">' + o.weight + (o.unit || '斤') + '</td></tr>';
+    }).join('');
+  });
+}
+
+function exportProcure2() {
+  if (!_procureDate2) return alert('请先选择日期');
+  apiGet('/api/orders?targetDate=' + encodeURIComponent(_procureDate2)).then(d => {
+    const orders = d.orders || [];
+    if (orders.length === 0) return alert('暂无采购清单');
+    let csv = '\uFEFF菜品,需求数量,备注\n';
+    orders.forEach(o => { csv += o.food + ',' + o.weight + (o.unit || '斤') + ',' + (o.remark || '') + '\n'; });
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = '采购清单_' + _procureDate2.replace(/\//g,'') + '.csv';
+    a.click();
+  });
+}
+
+// ====== 导出 ======
+function showHelp() {
+  alert(
+    '📖 呱呱超市使用说明\n\n' +
+    '1️⃣ 选择商家（预设：毛式菜业、浩源、国良等）\n' +
+    '2️⃣ 填写菜品、斤数、进价\n' +
+    '3️⃣ 总金额自动计算，选择是否已付款\n' +
+    '4️⃣ 点击"保存记录"\n\n' +
+    '📌 数据统一存储在服务器，多设备数据同步\n' +
+    '📌 月底查看「月度」统计，导出报表对账'
+  );
+}
+
+
+// ====== 角色切换 ======
+var currentRole = 'A';
+var capturedReturnPhoto = '';
+
+function switchRole(role) {
+  currentRole = role;
+  document.getElementById('roleBtnA').className = 'role-btn' + (role === 'A' ? ' active-a' : '');
+  document.getElementById('roleBtnB').className = 'role-btn' + (role === 'B' ? ' active-b' : '');
+  var bA = document.getElementById('roleBtnB_A');
+  var bB = document.getElementById('roleBtnB_B');
+  if (bA) bA.className = 'role-btn' + (role === 'A' ? ' active-a' : '');
+  if (bB) bB.className = 'role-btn' + (role === 'B' ? ' active-b' : '');
+  // page-record 中的采购A内容
+  var buyerAContent = document.getElementById('buyerA-content');
+  // page-buyerB div（采购B页面，在page-record外部）
+  var buyerBDiv = document.getElementById('page-buyerB');
+  // 三个页面区块都隐藏先
+  if (buyerAContent) buyerAContent.style.display = role === 'A' ? 'block' : 'none';
+  if (buyerBDiv) buyerBDiv.style.display = role === 'B' ? 'block' : 'none';
+  // 采购A时隐藏采购B的相关卡片（退框子等）
+  if (role === 'B') {
+    renderReturnShop();
+    initReturnDateSelect();
+  }
+}
+
+function updateDepositLabel() {
+  var big = parseInt(document.getElementById('bigBox').value) || 0;
+  var small = parseInt(document.getElementById('smallBox').value) || 0;
+  // 框子押金已计算（仅用于记账提交，不展示合计）
+}
+
+function renderReturnShop() {
+  var s = document.getElementById('returnShop');
+  if (!s || shops.length === 0) return;
+  s.innerHTML = '<option value="">请选择商家</option>';
+  shops.forEach(function(n) { s.innerHTML += '<option value="' + n.replace(/"/g,'&quot;') + '">' + n + '</option>'; });
+  calcReturnAmount();
+}
+
+function calcReturnAmount() {
+  var big = parseInt(document.getElementById('returnBig').value) || 0;
+  var small = parseInt(document.getElementById('returnSmall').value) || 0;
+  document.getElementById('returnAmount').value = big * 30 + small * 20;
+}
+
+function onReturnShopChange() {
+  var shop = document.getElementById('returnShop').value;
+  if (!shop) { calcReturnAmount(); return; }
+  fetch('/api/price/latest/' + encodeURIComponent(shop))
+    .then(function(r) { return r.json(); })
+    .then(function(p) {
+      // 临时改写 calcReturnAmount 的单价
+      var bigP = parseFloat(p.bigBoxPrice) || 30;
+      var smallP = parseFloat(p.smallBoxPrice) || 20;
+      calcReturnAmount = function() {
+        var big = parseInt(document.getElementById('returnBig').value) || 0;
+        var small = parseInt(document.getElementById('returnSmall').value) || 0;
+        document.getElementById('returnAmount').value = big * bigP + small * smallP;
+      };
+      calcReturnAmount();
+    })
+    .catch(function() { calcReturnAmount(); });
+}
+
+function onReturnPhoto(input) {
+  var file = input.files[0];
+  if (!file) return;
+  // 压缩图片，最长边 800px，质量 0.6
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    var img = new Image();
+    img.onload = function() {
+      var canvas = document.createElement('canvas');
+      var maxSize = 480;
+      var w = img.width, h = img.height;
+      if (w > maxSize || h > maxSize) {
+        if (w > h) { h = h * maxSize / w; w = maxSize; }
+        else { w = w * maxSize / h; h = maxSize; }
+      }
+      canvas.width = w; canvas.height = h;
+      var ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, w, h);
+      capturedReturnPhoto = canvas.toDataURL('image/jpeg', 0.4);
+      document.getElementById('returnPhotoPreview').innerHTML = '<img src="' + capturedReturnPhoto + '" style="max-width:100%;max-height:150px;border-radius:6px;display:block">';
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function submitReturn() {
+  var shop = document.getElementById('returnShop').value;
+  var big = parseInt(document.getElementById('returnBig').value) || 0;
+  var small = parseInt(document.getElementById('returnSmall').value) || 0;
+  var amount = parseFloat(document.getElementById('returnAmount').value) || 0;
+  if (!shop) return alert('请选择商家');
+  if (!capturedReturnPhoto) return alert('请先拍照留证');
+  if (!big && !small) return alert('请填写退框数量');
+  if (!amount) return alert('请填写退回押金');
+
+  var btn = document.querySelector('#page-buyerB .btn-blue') || document.querySelector('#page-buyerB .btn:last-child');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ 提交中...'; }
+
+  // 上传照片到服务器
+  var byteString = atob(capturedReturnPhoto.split(',')[1]);
+  var mime = capturedReturnPhoto.split(',')[0].split(':')[1].split(';')[0];
+  var ab = new ArrayBuffer(byteString.length);
+  var ia = new Uint8Array(ab);
+  for (var i = 0; i < byteString.length; i++) ia[i] = byteString.charCodeAt(i);
+  var blob = new Blob([ab], {type: mime});
+  var fd = new FormData();
+  fd.append('file', blob, 'return_' + Date.now() + '.jpg');
+
+  fetch('/api/upload?shop=' + encodeURIComponent(shop), { method: 'POST', body: fd })
+    .then(function(r) { return r.json(); })
+    .then(function(u) {
+      if (!u.success) throw new Error(u.error || '上传失败');
+      var photoPath = u.files ? u.files[0].path : '';
+      return fetch('/api/deposits', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ shop: shop, bigBox: big, smallBox: small, amount: amount, photo: photoPath, buyer: 'B' })
+      });
+    })
+    .then(function(r) { return r.json(); })
+    .then(function() {
+      alert('✅ 退框记录已提交\n商家：' + shop + '\n大框：' + big + '个 / 小框：' + small + '个\n退回押金：' + amount + '元');
+      resetReturnForm();
+      loadReturnRecords();
+    })
+    .catch(function(e) {
+      alert('❌ 提交失败：' + e.message);
+    })
+    .finally(function() {
+      if (btn) { btn.disabled = false; btn.textContent = '✅ 确认退框'; }
+    });
+}
+
+function resetReturnForm() {
+  document.getElementById('returnBig').value = '';
+  document.getElementById('returnSmall').value = '';
+  document.getElementById('returnAmount').value = '';
+  document.getElementById('certFileInput_return').value = '';
+  document.getElementById('returnPhotoPreview').innerHTML = '';
+  capturedReturnPhoto = '';
+}
+
+// ====== 退框记录查看 ======
+function loadReturnRecords() {
+  var dateInput = document.getElementById('returnDateInput');
+  var d = dateInput.value;
+  if (!d) return;
+  // 转成服务器格式 YYYY/MM/DD
+  var parts = d.split('-');
+  var date = parts[0] + '/' + parts[1] + '/' + parts[2];
+  fetch('/api/deposits?date=' + date).then(function(r) { return r.json(); }).then(function(d) {
+    var list = document.getElementById('returnRecordsList');
+    var deposits = d.deposits || [];
+    if (deposits.length === 0) {
+      list.innerHTML = '<div class="empty">暂无退框记录</div>';
+      return;
+    }
+    var total = 0;
+
+    // 按商家汇总
+    var summary = {};
+    var itemsByShop = {};
+    deposits.forEach(function(r) {
+      total += r.amount || 0;
+      if (!summary[r.shop]) {
+        summary[r.shop] = { bigBox: 0, smallBox: 0, amount: 0, items: [] };
+      }
+      summary[r.shop].bigBox += r.bigBox || 0;
+      summary[r.shop].smallBox += r.smallBox || 0;
+      summary[r.shop].amount += r.amount || 0;
+      var parts = [];
+      if (r.bigBox > 0) parts.push('大框' + r.bigBox + '个');
+      if (r.smallBox > 0) parts.push('小框' + r.smallBox + '个');
+      var photoHtml = r.photo ? ' 📸' : '';
+      summary[r.shop].items.push((r.time || '') + ' ' + parts.join('/') + ' ' + (r.amount||0) + '元' + photoHtml);
+      // 存最后一条有照片的图
+      if (r.photo) summary[r.shop].lastPhoto = r.photo;
+    });
+
+    var html = '';
+    Object.keys(summary).forEach(function(shop) {
+      var s = summary[shop];
+      var parts = [];
+      if (s.bigBox > 0) parts.push('大框' + s.bigBox + '个');
+      if (s.smallBox > 0) parts.push('小框' + s.smallBox + '个');
+      html += '<div class="item" style="margin-bottom:2px">';
+      html += '<strong>' + shop + '</strong><br>';
+      html += parts.join(' / ') + ' 退回 <strong style="color:#3b82f6">' + s.amount.toFixed(1) + '元</strong>';
+      if (s.lastPhoto) html += ' <span style="font-size:11px;color:#3b82f6;cursor:pointer;text-decoration:underline" onclick="viewReturnPhoto(\'' + s.lastPhoto + '\')">📷 查看照片</span>';
+      html += '<br>';
+      html += '<span style="font-size:11px;color:#999">' + s.items.join(' · ') + '</span>';
+      html += '</div>';
+    });
+
+    list.innerHTML = html;
+    list.innerHTML += '<div style="padding:8px 0;font-weight:bold;color:#333;border-top:1px solid #eee">当日退框合计：<span style="color:#3b82f6">' + total.toFixed(1) + '元</span></div>';
+  });
+}
+
+function initReturnDateSelect() {
+  var input = document.getElementById('returnDateInput');
+  var d = new Date();
+  var y = d.getFullYear();
+  var m = String(d.getMonth()+1).padStart(2,'0');
+  var day = String(d.getDate()).padStart(2,'0');
+  input.value = y + '-' + m + '-' + day;
+  loadReturnRecords();
+}
+
+// 底部分隔线，确保最后一个函数不带多余分号
+function noop(){}
+
+// ====== 图片放大弹窗 ======
+function viewReturnPhoto(path) {
+  var url = path.startsWith('http') ? path : '/' + path.replace(/^\/+/, '');
+  var overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.85);z-index:9999;display:flex;align-items:center;justify-content:center;cursor:pointer';
+  overlay.onclick = function() { document.body.removeChild(overlay); };
+  var img = document.createElement('img');
+  img.src = url;
+  img.style.cssText = 'max-width:95%;max-height:95%;border-radius:8px;box-shadow:0 2px 20px rgba(0,0,0,0.4)';
+  overlay.appendChild(img);
+  document.body.appendChild(overlay);
+}
+
+// ====== 打印功能 ======
+function printTodayList() {
+  const listEl = document.getElementById('todayList');
+  if (!listEl || !listEl.innerHTML.trim() || listEl.innerHTML.includes('暂无数据')) {
+    alert('今日没有数据，无法打印');
+    return;
+  }
+  const total = document.getElementById('todayTotal2').textContent || '0 元';
+  const count = document.getElementById('todayCount').textContent || '0';
+  const d = new Date();
+  const dateStr = d.getFullYear() + '年' + (d.getMonth()+1) + '月' + d.getDate() + '日';
+
+  const win = window.open('', '_blank');
+  win.document.write(`
+    <html><head><title>今日进货清单 - ${dateStr}</title>
+    <style>
+      body { font-family: "微软雅黑", sans-serif; padding: 20px; max-width: 400px; margin: 0 auto; }
+      h1 { text-align: center; font-size: 18px; color: #ff6b35; margin-bottom: 4px; }
+      .date { text-align: center; font-size: 13px; color: #999; margin-bottom: 16px; }
+      table { width: 100%; border-collapse: collapse; }
+      th, td { padding: 6px 4px; text-align: left; border-bottom: 1px solid #eee; font-size: 13px; }
+      th { background: #f5f5f5; font-weight: 600; }
+      .total { text-align: right; font-size: 14px; font-weight: bold; margin-top: 12px; padding-top: 8px; border-top: 2px solid #333; }
+      .footer { text-align: center; font-size: 11px; color: #ccc; margin-top: 20px; }
+      @media print { .no-print { display: none; } }
+    </style></head><body>
+    <h1>🛒 今日进货清单</h1>
+    <div class="date">${dateStr} · 共 ${count} 笔</div>
+    <table><thead><tr><th>商家</th><th>菜品</th><th>数量</th><th>金额</th></tr></thead><tbody>
+  `);
+
+  // 读取渲染好的列表数据
+  const items = listEl.querySelectorAll('[id^="record-"]') || listEl.children;
+  items.forEach(item => {
+    const txt = item.textContent || '';
+    const parts = txt.split('\n').filter(s => s.trim());
+    if (parts.length === 0) return;
+    // 尝试解析：商家、菜品、斤数、金额
+    const name = parts[0] || '';
+    const food = parts[1] || '';
+    const weight = parts.find(p => /[\d.]+斤/.test(p)) || '';
+    const money = parts.find(p => /[\d.]+元/.test(p)) || '';
+    win.document.write(`<tr><td>${name}</td><td>${food}</td><td>${weight}</td><td>${money}</td></tr>`);
+  });
+
+  win.document.write(`</tbody></table>
+    <div class="total">合计：${total}</div>
+    <div class="footer">呱呱超市 · 内部台账系统</div>
+    <div class="no-print" style="text-align:center;margin-top:16px">
+      <button onclick="window.print()" style="padding:8px 24px;background:#ff6b35;color:white;border:none;border-radius:6px;font-size:14px;cursor:pointer">🖨️ 打印</button>
+    </div>
+    </body></html>
+  `);
+  win.document.close();
+}
+
+// ====== 初始化 ======
+window.onload = function () {
+  loadAll();
+};
+</script>
+</body>
+</html>

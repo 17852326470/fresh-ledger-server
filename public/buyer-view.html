@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+ <meta charset="UTF-8">
+ <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+ <title>呱呱超市 · 建议采购单</title>
+<link rel="icon" href="/favicon.png" sizes="32x32">
+<link rel="apple-touch-icon" href="/favicon.png">
+ <style>
+ * { box-sizing: border-box; margin: 0; padding: 0; }
+ body {
+  font-family: -apple-system, BlinkMacSystemFont, "微软雅黑", sans-serif;
+  max-width: 450px;
+  margin: 0 auto;
+  background: #f5f5f5;
+  padding: 10px 10px 30px;
+  font-size: 15px;
+ }
+ .title { text-align: center; font-size: 20px; color: #ff6b35; font-weight: bold; margin: 8px 0; }
+ .card { background: white; border-radius: 10px; padding: 14px; margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+ .card-shop1 { border-left: 4px solid #ff6b35; }
+ .card-shop2 { border-left: 4px solid #3b82f6; }
+ .card-merge { border-left: 4px solid #28a745; background: #f0faf0; }
+ .card-warn { background: #fff8f5; border: 1px solid #ffcccc; }
+ h3 { font-size: 16px; font-weight: 600; color: #333; margin-bottom: 10px; padding-left: 8px; }
+ .info-text {
+  background: #f8f9fa; border-radius: 8px; padding: 10px; font-size: 13px;
+  color: #666; line-height: 1.6; margin-bottom: 10px;
+ }
+ .back-link { text-align: center; margin: 15px 0; font-size: 13px; }
+ .back-link a { color: #999; text-decoration: none; }
+ .back-link a:hover { color: #ff6b35; }
+ .status-bar {
+  background: #fff3cd; border-radius: 8px; padding: 8px 12px;
+  font-size: 12px; color: #856404; text-align: center; margin-bottom: 10px;
+ }
+ .date-picker { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; }
+ .date-picker input { flex: 1; padding: 8px; font-size: 14px; border: 1px solid #ddd; border-radius: 6px; }
+ .date-picker button { white-space: nowrap; padding: 8px 12px; width: auto; margin: 0; }
+ table { width: 100%; border-collapse: collapse; font-size: 13px; }
+ th { text-align: left; padding: 6px 4px; color: #666; border-bottom: 2px solid #ddd; font-size: 12px; }
+ th:nth-child(n+2), td:nth-child(n+2) { text-align: right; }
+ td { padding: 6px 4px; border-bottom: 1px solid #f0f0f0; }
+ .shop-tag { display: inline-block; font-size: 11px; padding: 2px 6px; border-radius: 4px; font-weight: 600; }
+ .shop-tag-1 { background: #fff0e8; color: #ff6b35; }
+ .shop-tag-2 { background: #e8f0ff; color: #3b82f6; }
+ .merge-row td { font-weight: 600; background: #f0faf0; }
+ .total-row { display: flex; justify-content: space-between; padding: 8px 0; font-size: 15px; font-weight: bold; }
+ .total-row .val { color: #ff6b35; }
+ .judge-item {
+  display: flex; justify-content: space-between; padding: 8px 0;
+  border-bottom: 1px solid #ffe0e0; font-size: 13px;
+ }
+ .judge-item:last-child { border-bottom: none; }
+ .judge-item .name { font-weight: 600; }
+ .judge-item .detail { color: #999; font-size: 12px; }
+ .judge-item .suggest { color: #ff6b35; font-weight: bold; font-size: 16px; }
+ .loading { text-align: center; color: #999; padding: 30px; font-size: 14px; }
+ .btn-outline {
+  background: white; border: 1px solid #ddd; color: #333; border-radius: 6px;
+  padding: 8px 12px; font-size: 14px; cursor: pointer; width: 100%; margin: 4px 0;
+ }
+ </style>
+</head>
+<body>
+
+<div class="title">🛒 建议采购单</div>
+
+<div class="date-picker">
+  <input type="date" id="datePicker">
+  <button class="btn-outline" onclick="loadData()" style="width:auto;margin:0">刷新</button>
+</div>
+<div class="status-bar" id="statusBar">⏳ 加载中...</div>
+
+<!-- 慧谷店 -->
+<div class="card card-shop1">
+  <h3>🏪 慧谷店建议采购</h3>
+  <div id="shop1Body" class="loading">加载中...</div>
+  <div class="total-row">
+    <span>慧谷店合计</span>
+    <span class="val" id="shop1Total">0 件</span>
+  </div>
+</div>
+
+<!-- 储庄店 -->
+<div class="card card-shop2">
+  <h3>🏪 储庄店建议采购</h3>
+  <div id="shop2Body" class="loading">加载中...</div>
+  <div class="total-row">
+    <span>储庄店合计</span>
+    <span class="val" id="shop2Total">0 件</span>
+  </div>
+</div>
+
+<!-- 合并采购单 -->
+<div class="card card-merge">
+  <h3>🔄 合并采购单</h3>
+  <div class="info-text">每个菜品展示各店冷库+货架合计，点击 📝 去记账。</div>
+  <div id="mergeBody">
+    <div class="loading">加载中...</div>
+  </div>
+  <div class="total-row" style="border-top:2px solid #28a745;margin-top:4px">
+    <span>总件数</span><span class="val" id="mergeTotal">0</span>
+  </div>
+</div>
+
+<!-- 分货参考 -->
+<div class="card card-shop1" style="border-left-color:#8e44ad;background:#faf0ff">
+  <h3 style="border-left-color:#8e44ad;">📦 分货参考</h3>
+  <div class="info-text">
+    数据来源：采购A在首页录入的今日自采记录（斤数）。先按斤换算为件数，再按各店需求比例分配。
+  </div>
+  <div id="distributeBody"><div style="text-align:center;color:#999;padding:10px">⏳ 暂不可用</div></div>
+</div>
+
+
+
+<div class="back-link"><a href="/stock-check.html">← 返回选择身份</a></div>
+
+<script>
+let ALL_VEGGIES = [];
+
+function getTodayDate() {
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+
+function getYesterdayDate() {
+  const d = new Date();
+  d.setDate(d.getDate() - 1);
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+
+function toSlashDate(iso) {
+  const parts = iso.split('-');
+  return parts[0] + '/' + parseInt(parts[1]) + '/' + parseInt(parts[2]);
+}
+
+function fq(q) {
+  if (q === 0 || q === null || q === undefined) return '0';
+  if (q === 0.5) return '半';
+  if (q === Math.floor(q)) return q.toString();
+  return q.toString();
+}
+
+const statusBar = document.getElementById('statusBar');
+
+async function loadData() {
+  // 盘点日期 = 昨天（前一天晚上的库存数据）
+  const summaryDate = toSlashDate(document.getElementById('datePicker').value);
+  // 采购日期 = 今天（匹配今天的已购记录）
+  const purchaseDate = toSlashDate(getTodayDate());
+  statusBar.textContent = '⏳ 加载中...';
+
+  try {
+    // 同时获取两个店的汇总数据（按前一天的盘点）
+    const [resp1, resp2] = await Promise.all([
+      fetch('/api/stock-check/summary?date=' + encodeURIComponent(summaryDate) + '&shop=1'),
+      fetch('/api/stock-check/summary?date=' + encodeURIComponent(summaryDate) + '&shop=2')
+    ]);
+
+    const data1 = await resp1.json();
+    const data2 = await resp2.json();
+
+    const shop1Map = data1.results.shop1 || {};
+    const shop2Map = data2.results.shop2 || {};
+
+    // 渲染单个店
+    renderShopTable(shop1Map, 'shop1Body', 'shop1Total', '慧谷店');
+    renderShopTable(shop2Map, 'shop2Body', 'shop2Total', '储庄店');
+
+    // 获取当天已采购菜品（匹配今天记账买的菜）
+    let purchasedSet = new Set();
+    try {
+      const pResp = await fetch('/api/purchased-today?date=' + encodeURIComponent(purchaseDate));
+      const pData = await pResp.json();
+      pData.items.forEach(item => purchasedSet.add(item.food));
+    } catch {}
+
+    // 合并
+    renderMerge(shop1Map, shop2Map, purchasedSet);
+
+    statusBar.textContent = '✅ 盘点 ' + summaryDate + ' · 采购 ' + purchaseDate;
+  } catch (e) {
+    statusBar.textContent = '❌ 加载失败: ' + e.message;
+  }
+}
+
+function renderShopTable(data, containerId, totalId, shopName) {
+  const container = document.getElementById(containerId);
+
+  // 筛选：冷库被处理过（包含0）或货架被处理过
+  const keys = Object.keys(data).filter(f => {
+    const d = data[f];
+    return d.coldExists || d.needJudge;
+  });
+
+  if (keys.length === 0) {
+    container.innerHTML = '<div style="text-align:center;color:#999;padding:10px">暂无数据</div>';
+    document.getElementById(totalId).textContent = '0 件';
+    return;
+  }
+
+  let html = '<table><thead><tr>' +
+    '<th>菜品</th><th style="color:#ff6b35">冷库</th><th style="color:#e67e22">货架</th><th style="color:#8e44ad">冷+架</th>' +
+    '</tr></thead><tbody>';
+
+  let totalCold = 0, totalShelf = 0;
+
+  keys.forEach(f => {
+    const d = data[f];
+    const coldQtyNum = d.coldQty || 0;
+    const shelfQtyNum = (d.needJudge && d.shelfQty >= 0) ? d.shelfQty : 0;
+    const coldUnit = d.coldUnit || '';
+    const shelfUnit = d.shelfUnit || '';
+
+    // 货架显示
+    let shelfDisplay, shelfColor;
+    if (d.needJudge && d.shelfQty === 0) {
+      shelfDisplay = '0' + (shelfUnit ? shelfUnit : '');
+      shelfColor = '#dc3545';
+    } else if (d.needJudge && d.shelfQty > 0) {
+      shelfDisplay = fq(d.shelfQty) + (shelfUnit ? shelfUnit : '');
+      shelfColor = '#e67e22';
+    } else {
+      shelfDisplay = '-';
+      shelfColor = '#999';
+    }
+
+    // 判断"必须采"：冷库填了0 或 货架填了0
+    const sum = coldQtyNum + shelfQtyNum;
+    const enough = sum >= 1.5;
+
+    let finalDisplay, finalColor;
+    if (!enough && (coldQtyNum === 0 || shelfQtyNum === 0)) {
+      if (coldQtyNum === 0 && shelfQtyNum === 0) {
+        finalDisplay = '⚠️ 必须采 (0)';
+      } else if (coldQtyNum > 0) {
+        finalDisplay = '⚠️ 必须采 (' + fq(coldQtyNum) + (coldUnit ? coldUnit : '') + ')';
+      } else {
+        finalDisplay = '⚠️ 必须采 (' + fq(shelfQtyNum) + (shelfUnit ? shelfUnit : '') + ')';
+      }
+      finalColor = '#dc3545';
+    } else {
+      finalDisplay = fq(sum) + (coldUnit || shelfUnit ? (coldUnit || shelfUnit) : '') + (enough ? ' ✅' : '');
+      finalColor = enough ? '#28a745' : '#8e44ad';
+    }
+
+    totalCold += coldQtyNum;
+    totalShelf += shelfQtyNum;
+
+    html += '<tr>' +
+      '<td style="font-weight:600">' + f + '</td>' +
+      '<td style="color:#ff6b35">' + (d.coldExists && coldQtyNum === 0 ? '0' + (coldUnit ? coldUnit : '') : (coldQtyNum > 0 ? fq(coldQtyNum) + (coldUnit ? coldUnit : '') : '-')) + '</td>' +
+      '<td style="color:' + shelfColor + '">' + shelfDisplay + '</td>' +
+      '<td style="color:' + finalColor + ';font-weight:bold">' + finalDisplay + '</td>' +
+    '</tr>';
+  });
+
+  html += '</tbody></table>';
+  container.innerHTML = html;
+
+  document.getElementById(totalId).textContent = fq(totalCold + totalShelf) + ' 件（冷' + fq(totalCold) + '+架' + fq(totalShelf) + '）';
+}
+
+function renderMerge(s1m, s2m, purchasedSet) {
+  const mergeBody = document.getElementById('mergeBody');
+  mergeBody.innerHTML = '';
+  purchasedSet = purchasedSet || new Set();
+
+  // 收集所有有数据的菜品
+  const allFoods = [...new Set([...Object.keys(s1m), ...Object.keys(s2m)])]
+    .filter(f => {
+      const d1 = s1m[f], d2 = s2m[f];
+      return (d1?.coldExists || d1?.needJudge) || (d2?.coldExists || d2?.needJudge);
+    }).sort();
+
+  if (allFoods.length === 0) {
+    mergeBody.innerHTML = '<div style="text-align:center;color:#999;padding:10px">暂无数据</div>';
+    document.getElementById('mergeTotal').textContent = '0';
+    return;
+  }
+
+  let html = '<table><thead><tr>' +
+    '<th>菜品</th><th style="color:#ff6b35">慧谷店</th><th style="color:#3b82f6">储庄店</th><th style="color:#28a745">合计</th><th style="width:30px"></th>' +
+    '</tr></thead><tbody>';
+
+  allFoods.forEach(f => {
+    const d1 = s1m[f], d2 = s2m[f];
+
+    function getSum(d) {
+      if (!d) return '-';
+      const coldQty = d.coldQty || 0;
+      const shelfQty = (d.needJudge && d.shelfQty >= 0) ? d.shelfQty : 0;
+      const sum = coldQty + shelfQty;
+      const unit = d.coldUnit || d.shelfUnit || '';
+      if (sum < 1.5 && (coldQty === 0 || shelfQty === 0)) {
+        if (coldQty === 0 && shelfQty === 0) return '⚠️ 必须采 (0' + unit + ')';
+        if (coldQty > 0) return '⚠️ 必须采 (' + fq(coldQty) + unit + ')';
+        return '⚠️ 必须采 (' + fq(shelfQty) + unit + ')';
+      }
+      return fq(sum) + unit + (sum >= 1.5 ? ' ✅' : '');
+    }
+
+    function rawSum(d) {
+      if (!d) return 0;
+      const c = d.coldQty || 0;
+      const s = (d.needJudge && d.shelfQty >= 0) ? d.shelfQty : 0;
+      return c + s;
+    }
+
+    const s1 = rawSum(d1), s2 = rawSum(d2);
+    const purchased = purchasedSet.has(f);
+
+    html += '<tr' + (purchased ? ' style="opacity:0.5;background:#f0faf0"' : '') + '>' +
+      '<td style="font-weight:600">' + f + (purchased ? ' ✅' : '') + '</td>' +
+      '<td style="color:#ff6b35;font-weight:bold">' + getSum(d1) + '</td>' +
+      '<td style="color:#3b82f6;font-weight:bold">' + getSum(d2) + '</td>' +
+      '<td style="color:#28a745;font-weight:bold">' + fq(s1 + s2) + '</td>' +
+      '<td>' + (purchased ? '<span style="color:#28a745;font-size:14px">✅</span>' :
+        '<a href="/index.html?autoFood=' + encodeURIComponent(f) +
+        '" style="font-size:16px;text-decoration:none;color:#ff6b35" title="去记账">📝</a>') + '</td>' +
+    '</tr>';
+  });
+
+  // 总合计
+  let grandTotal = 0;
+  allFoods.forEach(f => {
+    const d1 = s1m[f], d2 = s2m[f];
+    const c1 = d1?.coldQty || 0, s1 = (d1?.needJudge && d1?.shelfQty >= 0) ? (d1.shelfQty || 0) : 0;
+    const c2 = d2?.coldQty || 0, s2 = (d2?.needJudge && d2?.shelfQty >= 0) ? (d2.shelfQty || 0) : 0;
+    grandTotal += c1 + s1 + c2 + s2;
+  });
+
+  // 追加已购但不在汇总中的菜品（直接采购的，没经过库存核对流程）
+  const purchasedOnly = Array.from(purchasedSet).filter(f => !allFoods.includes(f));
+  if (purchasedOnly.length > 0) {
+    html += '<tr style="background:#f0fff0"><td colspan="5" style="padding:8px 4px;font-size:12px;color:#28a745;font-weight:bold;">✅ 以下菜品已采购（未在库存核对中）</td></tr>';
+    purchasedOnly.forEach(f => {
+      html += '<tr style="opacity:0.5;background:#f0faf0">' +
+        '<td style="font-weight:600">' + f + ' ✅</td>' +
+        '<td colspan="3" style="color:#28a745">已采购</td>' +
+        '<td><span style="color:#28a745;font-size:14px">✅</span></td>' +
+      '</tr>';
+    });
+  }
+
+  html += '</tbody></table>';
+  mergeBody.innerHTML = html;
+  document.getElementById('mergeTotal').textContent = fq(grandTotal) + ' 件';
+}
+
+// 初始加载 - 先从API获取完整菜品列表
+async function init() {
+  try {
+    const resp = await fetch('/api/foods?preset=true');
+    const data = await resp.json();
+    ALL_VEGGIES = data.foods || [];
+  } catch(e) {
+    console.log('加载菜品列表失败:', e);
+  }
+  document.getElementById('datePicker').value = getYesterdayDate();
+  loadData();
+}
+init();
+</script>
+</body>
+</html>

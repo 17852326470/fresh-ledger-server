@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>🍳 后厨 · 领菜登记</title>
+<link rel="icon" href="/favicon.png" sizes="32x32">
+<link rel="apple-touch-icon" href="/favicon.png">
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+  max-width: 450px; margin: 0 auto; padding: 10px;
+  background: #f5f5f5; font-size: 15px;
+}
+.title { text-align: center; font-size: 22px; color: #ff6b35; font-weight: bold; margin: 8px 0 12px; }
+.subtitle { text-align: center; margin-bottom: 12px; }
+.subtitle span {
+  display: inline-block; margin: 0 4px; padding: 8px 16px;
+  border-radius: 8px; cursor: pointer; font-size: 14px;
+}
+.subtitle .active { background: #ff6b35; color: white; }
+.subtitle .inactive { background: #ddd; color: #666; }
+.card { background: white; border-radius: 10px; padding: 12px 14px; margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+h3 { font-size: 16px; font-weight: 600; color: #333; margin-bottom: 8px; border-left: 4px solid #ff6b35; padding-left: 8px; }
+label { font-size: 13px; color: #666; display: block; margin-top: 6px; }
+input, select { 
+  width: 100%; padding: 10px; margin-top: 4px; margin-bottom: 6px;
+  border: 1px solid #ddd; border-radius: 8px; font-size: 15px;
+  box-sizing: border-box;
+}
+.btn {
+  width: 100%; padding: 12px; margin-top: 8px;
+  background: #ff6b35; color: white; border: none; border-radius: 8px;
+  font-size: 16px; cursor: pointer; font-weight: 600;
+}
+.btn:active { opacity: 0.8; }
+.empty { color: #ccc; text-align: center; padding: 20px; font-size: 14px; }
+.item { padding: 8px 0; border-bottom: 1px solid #f0f0f0; font-size: 14px; line-height: 1.5; }
+.item .meta { font-size: 12px; color: #999; }
+.item .del { float: right; color: #ff4444; cursor: pointer; font-size: 18px; }
+.total-row { 
+  background: #fff3ee; padding: 10px; border-radius: 8px; 
+  margin: 8px 0; text-align: center; font-size: 16px; font-weight: bold; color: #ff6b35;
+}
+.success-msg {
+  background: #e8f5e9; color: #2e7d32; padding: 12px; border-radius: 8px;
+  text-align: center; margin: 8px 0; display: none; font-size: 14px;
+}
+.page { display: none; }
+.page.active { display: block; }
+</style>
+</head>
+<body>
+
+<div class="title">🍳 后厨</div>
+
+<div class="subtitle">
+  <span class="active" id="tabTodayBtn" onclick="switchKitchen('today')">📦 今日领菜</span>
+  <span class="inactive" id="tabOrderBtn" onclick="switchKitchen('order')">📋 明日报菜</span>
+</div>
+
+<!-- 页面: 今日领菜 -->
+<div id="page-today" class="page active">
+<div id="successMsg" class="success-msg">✅ 已记录！</div>
+
+<div class="card">
+  <h3>📝 今天领了啥？</h3>
+  <label>菜品名称</label>
+  <input type="text" id="food" placeholder="如：西红柿、白菜" list="foodList">
+  <datalist id="foodList"></datalist>
+  <div class="row" style="display:flex;gap:8px">
+    <div style="flex:1"><label>数量</label><input type="number" id="weight" placeholder="如：5" step="0.5"></div>
+    <div style="flex:0 0 60px"><label>单位</label><select id="unit"><option>斤</option><option>盒</option><option>袋</option><option>箱</option><option>个</option><option>包</option></select></div>
+  </div>
+  <button class="btn" onclick="submitKitchen()">✅ 提交</button>
+</div>
+
+<div class="card">
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+    <h3 style="margin:0;flex:1">📋 领菜记录</h3>
+    <input type="date" id="kitchenDate" style="padding:4px 8px;border:1px solid #ddd;border-radius:4px;font-size:13px">
+    <button onclick="switchKitchenDate()" style="padding:4px 10px;border:1px solid #ff6b35;border-radius:4px;background:#ff6b35;color:#fff;font-size:12px;cursor:pointer">查询</button>
+  </div>
+  <div id="todaySummary" class="total-row">当日合计：0 元</div>
+  <div id="todayList"></div>
+</div>
+
+<div class="card" style="text-align:center;color:#999;font-size:12px">
+  <img src="/favicon.png" style="width:20px;height:20px;vertical-align:middle;border-radius:50%"> 呱呱超市 · 后厨入口
+</div>
+</div>
+
+<!-- 页面: 明日报菜 -->
+<div id="page-order" class="page">
+<div id="orderMsg" class="success-msg">✅ 已报菜！</div>
+
+<div class="card">
+  <h3>📋 需要采购什么？</h3>
+  <label>采购日期</label>
+  <input type="date" id="orderDate">
+  <label>菜品名称</label>
+  <input type="text" id="orderFood" placeholder="如：西红柿、白菜" list="foodList2">
+  <datalist id="foodList2"></datalist>
+  <div class="row" style="display:flex;gap:8px">
+    <div style="flex:1"><label>需要数量</label><input type="number" id="orderWeight" placeholder="如：20" step="0.5"></div>
+    <div style="flex:0 0 60px"><label>单位</label><select id="orderUnit"><option>斤</option><option>盒</option><option>袋</option><option>箱</option><option>个</option><option>包</option><option>瓶</option></select></div>
+  </div>
+  <label>备注</label>
+  <input type="text" id="orderRemark" placeholder="如：要新鲜的、要大个的等" style="width:100%">
+  <button class="btn" onclick="submitOrder()">📋 报菜</button>
+</div>
+
+<div class="card">
+  <h3>📋 明日报菜清单</h3>
+  <div id="orderList"></div>
+</div>
+
+<div class="card" style="text-align:center;color:#999;font-size:12px">
+  <img src="/favicon.png" style="width:20px;height:20px;vertical-align:middle;border-radius:50%"> 呱呱超市 · 后厨入口
+</div>
+</div>
+
+<script>
+const BASE = window.location.origin;
+let allRecords = [];
+
+function apiGet(path) { 
+  return fetch(BASE + path).then(r => r.json()); 
+}
+
+function apiPost(path, data) {
+  return fetch(BASE + path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  }).then(r => r.json());
+}
+
+function getLocalDate() {
+  const d = new Date();
+  return [d.getFullYear(), String(d.getMonth()+1).padStart(2,'0'), String(d.getDate()).padStart(2,'0')].join('/');
+}
+
+function switchKitchen(tab) {
+  document.getElementById('page-today').className = tab === 'today' ? 'page active' : 'page';
+  document.getElementById('page-order').className = tab === 'order' ? 'page active' : 'page';
+  document.getElementById('tabTodayBtn').className = tab === 'today' ? 'active' : 'inactive';
+  document.getElementById('tabOrderBtn').className = tab === 'order' ? 'active' : 'inactive';
+  
+  if (tab === 'order') renderOrders();
+}
+
+async function loadToday() {
+  // 设置日期选择器默认今天
+  const today = new Date();
+  const ymd = today.getFullYear() + '-' + String(today.getMonth()+1).padStart(2,'0') + '-' + String(today.getDate()).padStart(2,'0');
+  document.getElementById('kitchenDate').value = ymd;
+  await loadKitchenList(ymd);
+}
+
+function getSlashDate(ymd) {
+  return ymd.replace(/-/g, '/');
+}
+
+async function switchKitchenDate() {
+  const dateInput = document.getElementById('kitchenDate');
+  if (!dateInput.value) return;
+  await loadKitchenList(dateInput.value);
+}
+
+async function loadKitchenList(ymd) {
+  const slashDate = getSlashDate(ymd);
+  try {
+    const data = await apiGet('/api/records?date=' + encodeURIComponent(slashDate) + '&type=后厨');
+    allRecords = data.records || [];
+  } catch(e) { allRecords = []; }
+  
+  const total = allRecords.reduce((s, r) => s + r.money, 0);
+  document.getElementById('todaySummary').textContent = ymd + ' 合计：' + total.toFixed(1) + ' 元';
+  
+  const list = document.getElementById('todayList');
+  if (allRecords.length === 0) {
+    list.innerHTML = '<div class="empty">当天没有领菜记录</div>';
+  } else {
+    let html = '';
+    allRecords.forEach(r => {
+      html += '<div class="item">' +
+        '<span class="del" onclick="deleteRecord(\'' + r.id + '\')">✕</span>' +
+        '<strong>' + r.food + '</strong> ' + r.weight + (r.unit || '斤') +
+        '<div class="meta">' + (r.time || '') + '</div>' +
+        '</div>';
+    });
+    list.innerHTML = html;
+  }
+}
+
+function setPrice(id, food) {
+  const price = prompt('请输入 "' + food + '" 的进价（元/' + '斤）：', '');
+  if (price === null || price === '') return;
+  const p = parseFloat(price);
+  if (isNaN(p) || p <= 0) return alert('请输入有效的价格');
+  const weight = allRecords.find(r => r.id === id).weight;
+  const money = Math.round(weight * p * 100) / 100;
+  apiPut('/api/records/' + id, { price: p, money: money })
+    .then(function() { loadToday(); })
+    .catch(function(e) { alert('设置失败：' + e.message); });
+}
+
+async function loadFoodSuggestions() {
+  try {
+    const allData = await apiGet('/api/records?type=自采');
+    const allFoods = [...new Set((allData.records || []).map(r => r.food))];
+    const html = allFoods.map(f => '<option value="' + f + '">').join('');
+    document.getElementById('foodList').innerHTML = html;
+    document.getElementById('foodList2').innerHTML = html;
+  } catch(e) {}
+}
+
+async function submitKitchen() {
+  const food = document.getElementById('food').value.trim();
+  const weight = parseFloat(document.getElementById('weight').value);
+  const unit = document.getElementById('unit').value;
+  
+  if (!food) return alert('请输入菜品名称！');
+  if (!weight || weight <= 0) return alert('请输入有效的数量！');
+  
+  try {
+    const allData = await apiGet('/api/records?type=自采');
+    const allFood = (allData.records || []).filter(r => r.food === food);
+    const price = allFood.length > 0 ? allFood[0].price : 0;
+    const money = price > 0 ? Math.round(weight * price * 100) / 100 : 0;
+    
+    await apiPost('/api/records', {
+      shop: '后厨',
+      food: food,
+      weight: weight,
+      unit: unit,
+      price: price,
+      money: money,
+      status: '未付',
+      type: '后厨'
+    });
+    
+    document.getElementById('food').value = '';
+    document.getElementById('weight').value = '';
+    
+    const msg = document.getElementById('successMsg');
+    msg.textContent = '✅ 已记录：' + food + ' ' + weight + unit;
+    msg.style.display = 'block';
+    setTimeout(function() { msg.style.display = 'none'; }, 4000);
+    
+    await loadToday();
+  } catch(e) { alert('提交失败：' + e.message); }
+}
+
+async function deleteRecord(id) {
+  if (!confirm('确定删除这条记录？')) return;
+  try {
+    await fetch(BASE + '/api/records/' + id, { method: 'DELETE' });
+    await loadToday();
+  } catch(e) {}
+}
+
+// ====== 报菜功能 ======
+function renderOrders() {
+  const dateInput = document.getElementById('orderDate');
+  let targetDate = dateInput.value;
+  if (!targetDate) {
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    targetDate = [d.getFullYear(), String(d.getMonth()+1).padStart(2,'0'), String(d.getDate()).padStart(2,'0')].join('/');
+  } else {
+    // date input 是 YYYY-MM-DD，转 YYYY/MM/DD
+    const [y, m, d] = targetDate.split('-');
+    targetDate = y + '/' + String(parseInt(m)).padStart(2,'0') + '/' + String(parseInt(d)).padStart(2,'0');
+  }
+  
+  apiGet('/api/orders?targetDate=' + encodeURIComponent(targetDate))
+  .then(function(data) {
+    const orders = data.orders || [];
+    const list = document.getElementById('orderList');
+    if (orders.length === 0) {
+      list.innerHTML = '<div class="empty">暂无报菜</div>';
+    } else {
+      let html = '';
+      orders.forEach(function(o) {
+        html += '<div class="item">' +
+          '<span class="del" onclick="deleteOrder(' + o.id + ')">✕</span>' +
+          '<strong>' + o.food + '</strong> ' + o.weight + (o.unit || '斤') +
+          '<div class="meta">' + (o.remark ? '📝 ' + o.remark + ' · ' : '') + '报菜时间：' + (o.time || '') + '</div>' +
+          '</div>';
+      });
+      list.innerHTML = html;
+    }
+  })
+  .catch(function() {
+    document.getElementById('orderList').innerHTML = '<div class="empty">暂无报菜</div>';
+  });
+}
+
+async function submitOrder() {
+  const food = document.getElementById('orderFood').value.trim();
+  const weight = parseFloat(document.getElementById('orderWeight').value);
+  const unit = document.getElementById('orderUnit').value;
+  const remark = document.getElementById('orderRemark').value.trim();
+  const dateInput = document.getElementById('orderDate').value;
+  if (!food) return alert('请输入菜品名称！');
+  if (!weight || weight <= 0) return alert('请输入有效的数量！');
+  if (!dateInput) return alert('请选择采购日期！');
+  
+  // 将 YYYY-MM-DD 转为 YYYY/M/D
+  const [y, m, d] = dateInput.split('-');
+  const targetDate = y + '/' + parseInt(m) + '/' + parseInt(d);
+  
+  try {
+    await apiPost('/api/orders', { food: food, weight: weight, unit: unit, targetDate: targetDate, remark: remark });
+    document.getElementById('orderFood').value = '';
+    document.getElementById('orderWeight').value = '';
+    document.getElementById('orderRemark').value = '';
+    
+    const msg = document.getElementById('orderMsg');
+    msg.textContent = '✅ 已报菜：' + food + ' ' + weight + unit + '（' + targetDate + '采购）';
+    msg.style.display = 'block';
+    setTimeout(function() { msg.style.display = 'none'; }, 3000);
+    
+    renderOrders();
+  } catch(e) { alert('报菜失败：' + e.message); }
+}
+
+function deleteOrder(id) {
+  if (!confirm('删除这条报菜？')) return;
+  fetch(BASE + '/api/orders/' + id, { method: 'DELETE' })
+  .then(function() { renderOrders(); })
+  .catch(function() {});
+}
+
+// 设置默认日期为明天
+(function() {
+  const d = new Date();
+  d.setDate(d.getDate() + 1);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  document.getElementById('orderDate').value = y + '-' + m + '-' + dd;
+  document.getElementById('orderDate').onchange = renderOrders;
+})();
+
+// 初始化
+loadToday();
+loadFoodSuggestions();
+renderOrders();
+</script>
+</body>
+</html>
